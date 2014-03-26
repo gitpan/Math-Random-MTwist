@@ -1,0 +1,25 @@
+Math-Random-MTwist version 0.02
+===============================
+
+INSTALLATION
+
+To install this module type the following:
+
+   perl Makefile.PL
+   make
+   make test
+   make install
+
+
+COPYRIGHT
+
+Perl and XS portion: Copyright © 2014 by Carsten Gaebler.
+mtwist C library: Copyright © 2001, 2002, 2010, 2012, 2013 by Geoff Kuenning.
+
+
+LICENSE
+
+Perl and XS portion: Do What The Fuck You Want To Public License
+(http://wtfpl.net/).
+
+mtwist C library: LGPL (https://gnu.org/licenses/lgpl.html).
