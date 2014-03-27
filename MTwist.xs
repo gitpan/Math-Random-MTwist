@@ -15,36 +15,45 @@ MODULE = Math::Random::MTwist		PACKAGE = Math::Random::MTwist
 PROTOTYPES: ENABLE
 
 mt_state*
-mts_newstate()
-  INIT:
-    mt_state* state = NULL;
+_mts_newstate(char* CLASS)
   CODE:
-    Newxz(state, 1, mt_state);
-    if (state == NULL)
+    Newxz(RETVAL, 1, mt_state);
+    if (RETVAL == NULL)
       croak("Could not allocate state memory");
-    RETVAL = state;
   OUTPUT:
     RETVAL
 
 void
-mts_freestate(mt_state* state)
+DESTROY(mt_state* state)
   PPCODE:
     Safefree(state);
 
 void
-mts_seed32new(mt_state* state, uint32_t seed)
+seed32(mt_state* state, uint32_t seed)
+  PPCODE:
+    mts_seed32new(state, seed);
 
 uint32_t
-mts_seed(mt_state* state)
+fastseed(mt_state* state)
+  CODE:
+    RETVAL = mts_seed(state);
+  OUTPUT:
+    RETVAL
 
 uint32_t
-mts_goodseed(mt_state* state)
+goodseed(mt_state* state)
+  CODE:
+    RETVAL = mts_goodseed(state);
+  OUTPUT:
+    RETVAL
 
 void
-mts_bestseed(mt_state* state)
+bestseed(mt_state* state)
+  PPCODE:
+    mts_bestseed(state);
 
 void
-mts_seedfull(mt_state* state, AV* seeds)
+seedfull(mt_state* state, AV* seeds)
   INIT:
     int had_nz = 0;
     I32 i, top_index;
@@ -69,42 +78,52 @@ mts_seedfull(mt_state* state, AV* seeds)
        croak("Need at least one non-zero seed value");
      mts_seedfull(state, mt_seeds);
 
-uint32_t
-mts_lrand(mt_state* state)
-
 #if defined(UINT64_MAX)
 uint64_t
-mts_llrand(mt_state* state)
-
-uint64_t
-mts_irand(mt_state* state)
+irand(mt_state* state)
+  ALIAS:
+    irand64 = 1
   CODE:
+    PERL_UNUSED_VAR(ix);
     RETVAL = mts_llrand(state);
   OUTPUT:
     RETVAL
 
 #else
-void
-mts_llrand(mt_state* state)
-  PPCODE:
-
 uint32_t
-mts_irand(mt_state* state)
+irand(mt_state* state)
+  ALIAS:
+    irand64 = 1
   CODE:
-    RETVAL = mts_lrand(state);
+    if (ix == 0)
+      RETVAL = mts_lrand(state);
+    else
+      XSRETURN_UNDEF;
   OUTPUT:
     RETVAL
 
 #endif
 
-double
-mts_drand(mt_state* state)
+uint32_t
+irand32(mt_state* state)
+  CODE:
+    RETVAL = mts_lrand(state);
+  OUTPUT:
+    RETVAL
 
 double
-mts_ldrand(mt_state* state)
+rand(mt_state* state, double bound = 1)
+  ALIAS:
+    rand32 = 1
+  CODE:
+    if (bound == 0)
+      bound = 1;
+    RETVAL = (ix == 0 ? mts_ldrand(state) : mts_drand(state)) * bound;
+  OUTPUT:
+    RETVAL
 
 int
-mts_savestate(PerlIO* pio, mt_state* state)
+mts_savestate(mt_state* state, PerlIO* pio)
   INIT:
     FILE* file = PerlIO_exportFILE(pio, NULL);
   CODE:
@@ -115,7 +134,7 @@ mts_savestate(PerlIO* pio, mt_state* state)
     RETVAL
 
 int
-mts_loadstate(PerlIO* pio, mt_state* state)
+mts_loadstate(mt_state* state, PerlIO* pio)
   INIT:
     FILE* file = PerlIO_exportFILE(pio, NULL);
   CODE:
@@ -125,9 +144,9 @@ mts_loadstate(PerlIO* pio, mt_state* state)
     RETVAL
 
 double
-_rds_exponential(mt_state* state, double mean);
+rds_exponential(mt_state* state, double mean);
   ALIAS:
-    _rds_lexponential = 1
+    rds_lexponential = 1
   CODE:
       RETVAL = (ix == 0) ? rds_exponential(state, mean)
                          : rds_lexponential(state, mean);
@@ -135,21 +154,21 @@ _rds_exponential(mt_state* state, double mean);
     RETVAL
 
 double
-_rds_erlang(mt_state* state, int p, double mean);
+rds_erlang(mt_state* state, int k, double mean);
   ALIAS:
-    _rds_lerlang = 1
+    rds_lerlang = 1
   CODE:
-      RETVAL = (ix == 0) ? rds_erlang(state, p, mean)
-                         : rds_lerlang(state, p, mean);
+      RETVAL = (ix == 0) ? rds_erlang(state, k, mean)
+                         : rds_lerlang(state, k, mean);
   OUTPUT:
     RETVAL
 
 double
-_rds_weibull(mt_state* state, double shape, double scale);
+rds_weibull(mt_state* state, double shape, double scale);
   ALIAS:
-    _rds_lweibull = 1
-    _rds_lognormal = 2
-    _rds_llognormal = 3
+    rds_lweibull = 1
+    rds_lognormal = 2
+    rds_llognormal = 3
   CODE:
     switch (ix) {
       case 0:  RETVAL = rds_weibull(state, shape, scale); break;
@@ -161,9 +180,9 @@ _rds_weibull(mt_state* state, double shape, double scale);
     RETVAL
 
 double
-_rds_normal(mt_state* state, double mean, double sigma);
+rds_normal(mt_state* state, double mean, double sigma);
   ALIAS:
-    _rds_lnormal = 1
+    rds_lnormal = 1
   CODE:
       RETVAL = (ix == 0) ? rds_normal(state, mean, sigma)
                          : rds_lnormal(state, mean, sigma);
@@ -171,9 +190,9 @@ _rds_normal(mt_state* state, double mean, double sigma);
     RETVAL
 
 double
-_rds_triangular(mt_state* state, double lower, double upper, double mode);
+rds_triangular(mt_state* state, double lower, double upper, double mode);
   ALIAS:
-    _rds_ltriangular = 1
+    rds_ltriangular = 1
   CODE:
       RETVAL = (ix == 0) ? rds_triangular(state, lower, upper, mode)
                          : rds_ltriangular(state, lower, upper, mode);

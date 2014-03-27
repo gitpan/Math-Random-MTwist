@@ -1,4 +1,4 @@
-Math-Random-MTwist version 0.02
+Math-Random-MTwist version 0.03
 ===============================
 
 INSTALLATION
@@ -9,6 +9,11 @@ To install this module type the following:
    make
    make test
    make install
+
+
+USAGE
+
+See POD documentation in MTwist.pm
 
 
 COPYRIGHT

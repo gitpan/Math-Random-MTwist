@@ -6,6 +6,7 @@ use warnings;
 
 use Exporter 'import';
 use Time::HiRes 'gettimeofday';
+use XSLoader;
 
 use constant {
   MT_TIMESEED => \0,
@@ -14,26 +15,19 @@ use constant {
   MT_BESTSEED => \0,
 };
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
-our %EXPORT_TAGS = ();
-our @EXPORT = qw(
-                  MT_TIMESEED
-                  MT_FASTSEED
-                  MT_GOODSEED
-                  MT_BESTSEED
-);
+our @EXPORT = qw(MT_TIMESEED MT_FASTSEED MT_GOODSEED MT_BESTSEED);
 our @EXPORT_OK = @EXPORT;
+our %EXPORT_TAGS = ();
 
-require XSLoader;
 XSLoader::load('Math::Random::MTwist', $VERSION);
 
 sub new {
   my $class = shift;
   my $seed = shift;
 
-  my $state = mts_newstate();
-  my $self = bless \$state, $class;
+  my $self = _mts_newstate($class);
 
   if (! defined $seed) {
     $self->fastseed();
@@ -63,59 +57,9 @@ sub new {
   $self;
 }
 
-sub seed32 {
-  mts_seed32new(${shift()}, shift);
-}
-
-sub seedfull {
-  mts_seedfull(${shift()}, \@_);
-}
-
 sub timeseed {
   my ($sec, $usec) = gettimeofday();
   shift->seed32($sec * 1_000_000 + $usec);
-}
-
-sub fastseed {
-  mts_seed(${shift()});
-}
-
-sub goodseed {
-  mts_goodseed(${shift()});
-}
-
-sub bestseed {
-  mts_bestseed(${shift()});
-}
-
-# Returns a 64-bit unsigned integer if the platform supports it (see irand64),
-# otherwise a 32-bit one.
-sub irand {
-  mts_irand(${shift()});
-}
-
-# 32-bit unsigned integer pseudo-random number.
-sub irand32 {
-  mts_lrand(${shift()});
-}
-
-# 64-bit unsigned integer pseudo-random number.
-# If Perl is 64-bit, returns a native integer (UV).
-# If Perl is 32-bit but the OS knows the uint64_t type, returns a double (NV)
-# Otherwise it returns undef.
-sub irand64 {
-  mts_llrand(${shift()});
-}
-
-# Random double in [0, $bound) generated from a random 64-bit int
-sub rand {
-  mts_ldrand(${shift()}) * (shift || 1);
-}
-
-# Random double in [0, $bound) generated from a random 32-bit int
-# (faster than rand)
-sub rand32 {
-  mts_drand(${shift()}) * (shift || 1);
 }
 
 sub savestate {
@@ -126,7 +70,7 @@ sub savestate {
     open my $fh, '>', $file or return 0;
     $fh;
   };
-  mts_savestate($fh, $$self);
+  $self->mts_savestate($fh);
 }
 
 sub loadstate {
@@ -137,59 +81,7 @@ sub loadstate {
     open my $fh, '<', $file or return 0;
     $fh;
   };
-  mts_loadstate($fh, $$self);
-}
-
-sub rds_exponential {
-  _rds_exponential(${shift()}, @_);
-}
-
-sub rds_lexponential {
-  _rds_lexponential(${shift()}, @_);
-}
-
-sub rds_erlang {
-  _rds_erlang(${shift()}, @_);
-}
-
-sub rds_lerlang {
-  _rds_lerlang(${shift()}, @_);
-}
-
-sub rds_weibull {
-  _rds_weibull(${shift()}, @_);
-}
-
-sub rds_lweibull {
-  _rds_lweibull(${shift()}, @_);
-}
-
-sub rds_normal {
-  _rds_normal(${shift()}, @_);
-}
-
-sub rds_lnormal {
-  _rds_lnormal(${shift()}, @_);
-}
-
-sub rds_lognormal {
-  _rds_lognormal(${shift()}, @_);
-}
-
-sub rds_llognormal {
-  _rds_llognormal(${shift()}, @_);
-}
-
-sub rds_triangular {
-  _rds_triangular(${shift()}, @_);
-}
-
-sub rds_ltriangular {
-  _rds_ltriangular(${shift()}, @_);
-}
-
-sub DESTROY {
-  mts_freestate(${shift()});
+  $self->mts_loadstate($fh);
 }
 
 1;
@@ -354,9 +246,9 @@ the expense of speed.
 
 Generates an exponential distribution with the given mean.
 
-=head2 rds_(l)erlang(int p, double mean)
+=head2 rds_(l)erlang(int k, double mean)
 
-Generates a p-Erlang distribution with the given mean.
+Generates an Erlang-k distribution with the given mean.
 
 =head2 rds_(l)weibull(double shape, double scale)
 
