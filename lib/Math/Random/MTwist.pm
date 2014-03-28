@@ -4,7 +4,7 @@ use 5.010_000;
 use strict;
 use warnings;
 
-use Exporter 'import';
+use Exporter;
 use Time::HiRes 'gettimeofday';
 use XSLoader;
 
@@ -15,13 +15,53 @@ use constant {
   MT_BESTSEED => \0,
 };
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
+our @ISA = 'Exporter';
 our @EXPORT = qw(MT_TIMESEED MT_FASTSEED MT_GOODSEED MT_BESTSEED);
 our @EXPORT_OK = @EXPORT;
-our %EXPORT_TAGS = ();
+our %EXPORT_TAGS = (
+  'seed' => [qw(seed32 seedfull timeseed fastseed goodseed bestseed)],
+  'rand' => [qw(srand rand rand32 rand64 irand irand32 irand64)],
+  'dist' => [qw(
+                 rd_erlang rd_lerlang
+                 rd_exponential rd_lexponential
+                 rd_lognormal rd_llognormal
+                 rd_normal rd_lnormal
+                 rd_triangular rd_ltriangular
+                 rd_weibull rd_lweibull
+             )],
+  'state' => [qw(savestate loadstate)],
+);
 
 XSLoader::load('Math::Random::MTwist', $VERSION);
+
+sub import {
+  my $this = shift;
+
+  my $caller = caller;
+  my $srand_called = 0;
+
+  my $importable_subs = join '|', map @$_, values %EXPORT_TAGS;
+  $importable_subs = qr/^(?:$importable_subs)$/;
+
+  my @remaining_args;
+  while (defined(my $arg = shift)) {
+    if ($arg =~ /^:(.+)/ && exists $EXPORT_TAGS{$1}) {
+      push @_, @{$EXPORT_TAGS{$1}};
+    }
+    elsif ($arg =~ $importable_subs) {
+      no strict 'refs';
+      *{"$caller\::$arg"} = \&{"$this\::_$arg"};
+      _srand() if ! $srand_called++;
+    }
+    else {
+      push @remaining_args, $arg;
+    }
+  }
+
+  __PACKAGE__->export_to_level(1, $this, @remaining_args);
+}
 
 sub new {
   my $class = shift;
@@ -73,6 +113,16 @@ sub savestate {
   $self->mts_savestate($fh);
 }
 
+sub _savestate {
+  my $file = shift; # name or handle
+
+  my $fh = ref $file eq 'GLOB' ? $file : do {
+    open my $fh, '>', $file or return 0;
+    $fh;
+  };
+  mt_savestate($fh);
+}
+
 sub loadstate {
   my $self = shift;
   my $file = shift;
@@ -82,6 +132,16 @@ sub loadstate {
     $fh;
   };
   $self->mts_loadstate($fh);
+}
+
+sub _loadstate {
+  my $file = shift;
+
+  my $fh = ref $file eq 'GLOB' ? $file : do {
+    open my $fh, '<', $file or return 0;
+    $fh;
+  };
+  mt_loadstate($fh);
 }
 
 1;
@@ -99,6 +159,7 @@ generator
 
 =head1 SYNOPSIS
 
+  # object-oriented inteface
   use Math::Random::MTwist;
 
   my $mt = Math::Random::MTwist->new();  # seed from /dev/urandom
@@ -107,16 +168,37 @@ generator
   $mt->goodseed();                       # seed from /dev/random
   $mt->savestate("/tmp/foobar");         # save current state to file
   $mt->loadstate("/tmp/foobar");         # load past state from file
-  my @dist = map $mt->rds_triangular(1, 3, 2), 1 .. 1e3;  # triangular dist.
+  my @dist = map $mt->rd_triangular(1, 3, 2), 1 .. 1e3;  # triangular dist.
+
+  # function-oriented interface (OO interface may be used in parallel)
+  use Math::Random::MTwist qw(seed32 seedfull
+                              timeseed fastseed goodseed bestseed);
+  use Math::Random::MTwist qw(:seed) # gives you all of the above
+
+  use Math::Random::MTwist qw(srand rand rand32 irand irand32 irand64);
+  use Math::Random::MTwist qw(:rand); # gives you all of the above
+
+  use Math::Random::MTwist qw(rd_exponential rd_triangular rd_normal ...);
+  use Math::Random::MTwist qw(:dist); # gives you alll of the above
+
+  use Math::Random::MTwist qw(savestate loadstate);
+  use Math::Random::MTwist qw(:state); # gives you alll of the above
 
 =head1 DESCRIPTION
 
-Math::Random::MTwist is an object-oriented Perl interface to Geoff Kuenning's
-mtwist C library. It provides several seeding methods, an independent state per
+Math::Random::MTwist is a Perl interface to Geoff Kuenning's mtwist C
+library. It provides several seeding methods, an independent state per OO
 instance and various random number distributions.
 
-Random number generation is significantly faster than with Math::Random::MT
-(kudos to Geoff).
+All functions are available through a function-oriented interface and an
+object-oriented interface. If you use the function-oriented interface the
+generator maintains a single global state while with the OO interface each
+instance has its individual state.
+
+The function-oriented interface provides drop-in replacements for Perl's
+built-in C<rand()> and C<srand()> functions. If you C<use> the module with an
+import list C<srand()> is called once automatically. If you need the C<MT_>
+constants too you must import them through the tag C<:DEFAULT>.
 
 This module is not C<fork()/clone()> aware, i.e. you have to take care of
 re-seeding/re-instantiating in new processes/threads yourself.
@@ -140,19 +222,25 @@ random number streams.
 =head2 seed32($number)
 
 Seeds the generator with C<$number>. The value will be coerced into an unsigned
-32-bit integer. Calls mtwist's C<mts_seed32new()>.
+32-bit integer. Calls mtwist's C<mts_seed32new()>. Returns the seed.
 
-=head2 seedfull($arrayref)
+=head2 srand($number)
 
-Seeds the generator with up to 624 numbers from C<$arrayref>. The values are
-coerced into unsigned 32-bit integers. Missing values are padded with zeros,
-excess values are ignored. Calls mtwist's C<mts_seedfull()>.
+Calls C<seed32> if C<$number> is given, C<fastseed()> otherwise. Returns the
+seed.
+
+=head2 seedfull($seeds)
+
+Seeds the generator with up to 624 numbers from the I<array reference>
+C<$seeds>. The values are coerced into unsigned 32-bit integers. Missing values
+are padded with zeros, excess values are ignored. Calls mtwist's
+C<mts_seedfull()>.
 
 =head2 timeseed()
 
 Seeds the generator from the current system time obtained with
 C<gettimeofday()> by calculating C<seconds * 1e6 + microseconds> and coercing
-the result into an unsigned 32-bit integer.
+the result into an unsigned 32-bit integer. Returns the seed.
 
 This method is called by C<new(MT_TIMESEED)>.
 
@@ -166,7 +254,7 @@ C<Time::HiRes::gettimeofday()>.
 
 Seeds the generator with 4 bytes read from C</dev/urandom> if available,
 otherwise from the system time (see details under C<timeseed()>). Calls
-mtwist's C<mts_seed()>.
+mtwist's C<mts_seed()>. Returns the seed.
 
 This method is called by C<new(MT_FASTSEED)>.
 
@@ -174,7 +262,7 @@ This method is called by C<new(MT_FASTSEED)>.
 
 Seeds the generator with 4 bytes read from C</dev/random> if available,
 otherwise from the system time (see details under C<timeseed()>). Calls
-mtwist's C<mts_goodseed()>.
+mtwist's C<mts_goodseed()>. Returns the seed.
 
 This method is called by C<new(MT_GOODSEED)>.
 
@@ -183,7 +271,7 @@ This method is called by C<new(MT_GOODSEED)>.
 Seeds the generator with 642 integers read from C</dev/random> if
 available. This might take a very long time and is probably not worth the
 waiting. If C</dev/random> is unavailable or there was a reading error it falls
-back to C<goodseed()>. Calls mtwist's C<mts_bestseed()>.
+back to C<goodseed()>. Calls mtwist's C<mts_bestseed()>. Returns the seed.
 
 This method is called by C<new(MT_BESTSEED)>.
 
@@ -237,33 +325,36 @@ C<$bound> may be negative. If C<$bound> is omitted or zero it defaults to 1.
 
 =head1 NON-UNIFORMLY DISTRIBUTED RANDOM NUMBERS
 
-The following methods come in two variants: C<B<rds_>xxx> and
-C<B<rds_l>xxx>. They all return a double but the C<B<rds_>xxx> versions provide
-32-bit precision while the C<B<rds_l>xxx> versions provide 52-bit precision at
+The following methods come in two variants: C<B<rd_>xxx> and
+C<B<rd_l>xxx>. They all return a double but the C<B<rd_>xxx> versions provide
+32-bit precision while the C<B<rd_l>xxx> versions provide 52-bit precision at
 the expense of speed.
 
-=head2 rds_(l)exponential(double mean)
+Despite their names they call mtwist's C<rds_xxx> functions if used with the OO
+interface.
+
+=head2 rd_(l)exponential(double mean)
 
 Generates an exponential distribution with the given mean.
 
-=head2 rds_(l)erlang(int k, double mean)
+=head2 rd_(l)erlang(int k, double mean)
 
 Generates an Erlang-k distribution with the given mean.
 
-=head2 rds_(l)weibull(double shape, double scale)
+=head2 rd_(l)weibull(double shape, double scale)
 
 Generates a Weibull distribution with the given shape and scale.
 
-=head2 rds_(l)normal(double mean, double sigma)
+=head2 rd_(l)normal(double mean, double sigma)
 
 Generates a normal (Gaussian) distribution with the given mean and standard
 deviation sigma.
 
-=head2 rds_(l)lognormal(double shape, double scale)
+=head2 rd_(l)lognormal(double shape, double scale)
 
 Generates a log-normal distribution with the given shape and scale.
 
-=head2 rds_(l)triangular(double lower, double upper, double mode)
+=head2 rd_(l)triangular(double lower, double upper, double mode)
 
 Generates a triangular distribution in the range C<[lower, upper)> with the
 given mode.
@@ -277,11 +368,16 @@ MT_BESTSEED that can be used as an argument to the constructor.
 
 L<http://www.cs.hmc.edu/~geoff/mtwist.html>
 
+L<Math::Random::MT|https://metacpan.org/pod/Math::Random::MT> and
+L<Math::Random::MT::Auto|https://metacpan.org/pod/Math::Random::MT::Auto> are
+significantly slower than Math::Random::MTwist. On the other hand MRMA has some
+additional sophisticated features.
+
 =head1 AUTHOR
 
 Carsten Gaebler (cgpan ʇɐ gmx ʇop de). I only accept encrypted e-mails, either
-via L<SMIME|http://cpan.org/authors/id/C/CG/CGPAN/cgpan-smime.crt> or
-L<GPG|http://cpan.org/authors/id/C/CG/CGPAN/cgpan-gpg.asc>.
+via L<SMIME|https://cpan.metacpan.org/authors/id/C/CG/CGPAN/cgpan-smime.crt> or
+L<GPG|https://cpan.metacpan.org/authors/id/C/CG/CGPAN/cgpan-gpg.asc>.
 
 =head1 COPYRIGHT
 

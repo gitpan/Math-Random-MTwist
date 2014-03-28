@@ -1,5 +1,10 @@
-Math-Random-MTwist version 0.03
+Math-Random-MTwist version 0.04
 ===============================
+
+PREREQUISITES
+
+Perl >= 5.10.0 (see Makefile.PL), Test::More.
+
 
 INSTALLATION
 

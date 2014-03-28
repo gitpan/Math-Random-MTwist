@@ -1,5 +1,11 @@
 Revision history for Perl extension Math::Random::MTwist.
 
+0.04  2014-03-28
+* Added a function-oriented interface.
+* Renamed rds_* to rd_*.
+* Added get_seeds_from_av() to fill the seed array for seedfull().
+* More tests.
+
 0.03  2014-03-27
 * Moved most methods from MTwist.pm to MTwist.xs for even more speed.
 
