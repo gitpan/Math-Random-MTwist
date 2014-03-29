@@ -15,7 +15,7 @@ use constant {
   MT_BESTSEED => \0,
 };
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 our @ISA = 'Exporter';
 our @EXPORT = qw(MT_TIMESEED MT_FASTSEED MT_GOODSEED MT_BESTSEED);
@@ -169,19 +169,16 @@ built-in C<rand()> and C<srand()> functions. If you C<use> the module with an
 import list C<srand()> is called once automatically. If you need the C<MT_>
 constants too you must import them through the tag C<:DEFAULT>.
 
-This module is not C<fork()/clone()> aware, i.e. you have to take care of
-re-seeding/re-instantiating in new processes/threads yourself.
-
 =head1 CONSTRUCTOR
 
 =head2 new()
 
 Takes an optional argument specifying the seed. The seed can be a number (will
-be coerced into an unsigned 32-bit integer), an array reference holding up to
-624 such numbers (missing values are padded with zeros, excess values are
-ignored) or one of the special values C<MT_TIMESEED>, C<MT_FASTSEED>,
-C<MT_GOODSEED> or C<MT_BESTSEED> that choose one of the corresponding seeding
-methods (see below). If no seed is given, C<MT_FASTSEED> is assumed.
+be coerced to an unsigned 32-bit integer), an array reference holding up to 624
+such numbers (missing values are padded with zeros, excess values are ignored)
+or one of the special values C<MT_TIMESEED>, C<MT_FASTSEED>, C<MT_GOODSEED> or
+C<MT_BESTSEED> that choose one of the corresponding seeding methods (see
+below). If no seed is given, C<MT_FASTSEED> is assumed.
 
 Each instance maintains an individual PRNG state allowing multiple independent
 random number streams.
@@ -190,7 +187,7 @@ random number streams.
 
 =head2 seed32($number)
 
-Seeds the generator with C<$number>. The value will be coerced into an unsigned
+Seeds the generator with C<$number>. The value will be coerced to an unsigned
 32-bit integer. Calls mtwist's C<mts_seed32new()>. Returns the seed.
 
 =head2 srand($number)
@@ -201,7 +198,7 @@ seed.
 =head2 seedfull($seeds)
 
 Seeds the generator with up to 624 numbers from the I<array reference>
-C<$seeds>. The values are coerced into unsigned 32-bit integers. Missing values
+C<$seeds>. The values are coerced to unsigned 32-bit integers. Missing values
 are padded with zeros, excess values are ignored. Calls mtwist's
 C<mts_seedfull()>.
 
@@ -209,7 +206,7 @@ C<mts_seedfull()>.
 
 Seeds the generator from the current system time obtained with
 C<gettimeofday()> by calculating C<seconds * 1e6 + microseconds> and coercing
-the result into an unsigned 32-bit integer. Returns the seed.
+the result to an unsigned 32-bit integer. Returns the seed.
 
 This method is called by C<new(MT_TIMESEED)>.
 
@@ -240,7 +237,7 @@ This method is called by C<new(MT_GOODSEED)>.
 Seeds the generator with 642 integers read from C</dev/random> if
 available. This might take a very long time and is probably not worth the
 waiting. If C</dev/random> is unavailable or there was a reading error it falls
-back to C<goodseed()>. Calls mtwist's C<mts_bestseed()>. Returns the seed.
+back to C<goodseed()>. Calls mtwist's C<mts_bestseed()>.
 
 This method is called by C<new(MT_BESTSEED)>.
 
@@ -275,8 +272,8 @@ Returns a random unsigned 32-bit integer. Calls mtwist's C<mts_lrand()>.
 
 If your Perl is 64-bit, returns a 64-bit unsigned integer. If your Perl is
 32-bit but your OS knows the C<uint64_t> type, returns a 64-bit unsigned
-integer coerced into a double (so it's the full 64-bit range but with only
-52-bit precision). Otherwise it returns undef. Calls mtwist's C<mts_llrand()>.
+integer coerced to a double (so it's the full 64-bit range but with only 52-bit
+precision). Otherwise it returns undef. Calls mtwist's C<mts_llrand()>.
 
 =head2 rand($bound)
 
@@ -332,6 +329,19 @@ given mode.
 
 The module exports the constants MT_TIMESEED, MT_FASTSEED, MT_GOODSEED and
 MT_BESTSEED that can be used as an argument to the constructor.
+
+=head1 NOTES
+
+This module is not C<fork()/clone()> aware, i.e. you have to take care of
+re-seeding/re-instantiating in new processes/threads yourself.
+
+Imported functions and OO methods have the same names. This works by symbol
+table "redirection", e.g. non-OO irand() is actually _irand() internally and so
+on (note the underscore). The minor drawback is that you can't use fully
+qualified names like C<Math::Random::MTwist::irand()> etc. Instead you have to
+say C<Math::Random::MTwist::_irand()>. I considered avoiding this by checking
+if the first argument is a blessed reference but I discarded that in favor of
+speed.
 
 =head1 SEE ALSO
 

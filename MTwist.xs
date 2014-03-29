@@ -79,7 +79,7 @@ _seed32(uint32_t seed)
 uint32_t
 srand(mt_state* state, uint32_t seed = 0)
   CODE:
-    if (items == 0)
+    if (items == 1)
       RETVAL = mts_seed(state);
     else {
       mts_seed32new(state, seed);

@@ -1,5 +1,8 @@
 Revision history for Perl extension Math::Random::MTwist.
 
+0.06  2014-03-29
+* FIX: MTwist.xs: srand() minimum items is 1 not 0.
+
 0.05  2014-03-29
 * Added missing _timeseed().
 * Moved savestate() and loadstate() from MTwist.pm to MTwist.xs.
