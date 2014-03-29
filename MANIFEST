@@ -4,6 +4,7 @@ MANIFEST
 MTwist.xs
 ppport.h
 README
+typemap
 t/Math-Random-MTwist.t
 lib/Math/Random/MTwist.pm
 mtwist/CHANGELOG
@@ -18,3 +19,5 @@ mtwist/randistrs.h
 mtwist/rdcctest.cc
 mtwist/rdtest.c
 mtwist/README
+META.yml                                 Module YAML meta-data (added by MakeMaker)
+META.json                                Module JSON meta-data (added by MakeMaker)

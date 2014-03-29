@@ -1,18 +1,16 @@
-use 5.010_000;
-# Why Perl 5.10? mtwist needs a fairly "modern" compiler (see mtwist.h). Now
-# what's the oldest Perl shipped together with a sufficiently recent compiler?
-# If it comes to "old", Debian is the first choice. The oldest Debian capable
-# of compiling mtwist is Lenny. Lenny ships Perl 5.10.0.
-
+use 5.010_000;  # see README
 use Config;
 use ExtUtils::MakeMaker;
 
 WriteMakefile(
-  NAME         => 'Math::Random::MTwist',
-  VERSION_FROM => 'lib/Math/Random/MTwist.pm',
-  PREREQ_PM    => { 'Test::More' => 0 },
-  INC          => '-I.',
-  OBJECT       => '$(O_FILES)',
+  NAME          => 'Math::Random::MTwist',
+  AUTHOR        => 'Carsten Gaebler',
+  ABSTRACT_FROM => 'lib/Math/Random/MTwist.pm',
+  VERSION_FROM  => 'lib/Math/Random/MTwist.pm',
+  PREREQ_PM     => { 'Time::HiRes' => 0 },
+  TEST_REQUIRES => { 'Test::More' => 0 },
+  INC           => '-I.',
+  OBJECT        => '$(O_FILES)',
 );
 
 my $int64_type = $Config{ivsize} > 4 ? 'T_IV' : 'T_NV';

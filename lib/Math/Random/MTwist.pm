@@ -1,6 +1,6 @@
 package Math::Random::MTwist;
 
-use 5.010_000;
+use 5.010_000;  # see README
 use strict;
 use warnings;
 
@@ -15,52 +15,59 @@ use constant {
   MT_BESTSEED => \0,
 };
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 our @ISA = 'Exporter';
 our @EXPORT = qw(MT_TIMESEED MT_FASTSEED MT_GOODSEED MT_BESTSEED);
 our @EXPORT_OK = @EXPORT;
 our %EXPORT_TAGS = (
-  'seed' => [qw(seed32 seedfull timeseed fastseed goodseed bestseed)],
-  'rand' => [qw(srand rand rand32 rand64 irand irand32 irand64)],
-  'dist' => [qw(
-                 rd_erlang rd_lerlang
-                 rd_exponential rd_lexponential
-                 rd_lognormal rd_llognormal
-                 rd_normal rd_lnormal
-                 rd_triangular rd_ltriangular
-                 rd_weibull rd_lweibull
-             )],
+  'rand'  => [qw(srand rand rand32 rand64 irand irand32 irand64)],
+  'seed'  => [qw(seed32 seedfull timeseed fastseed goodseed bestseed)],
   'state' => [qw(savestate loadstate)],
+  'dist'  => [
+    qw(
+        rd_erlang rd_lerlang
+        rd_exponential rd_lexponential
+        rd_lognormal rd_llognormal
+        rd_normal rd_lnormal
+        rd_triangular rd_ltriangular
+        rd_weibull rd_lweibull
+    )],
 );
 
 XSLoader::load('Math::Random::MTwist', $VERSION);
 
+# We want the function-oriented interface to provide the same function names as
+# the OO interface. But since it doesn't have the state argument (aka $self),
+# MTwist.xs provides counterparts with a leading underscore that we map to here.
 sub import {
   my $this = shift;
 
-  my $caller = caller;
-  my $srand_called = 0;
+  my @unhandled_args;
 
-  my $importable_subs = join '|', map @$_, values %EXPORT_TAGS;
-  $importable_subs = qr/^(?:$importable_subs)$/;
+  if (@_) {
+    my $caller = caller;
+    my $call_srand = 0;
+    my %exportable = map +($_ => 1), map @$_, values %EXPORT_TAGS;
 
-  my @remaining_args;
-  while (defined(my $arg = shift)) {
-    if ($arg =~ /^:(.+)/ && exists $EXPORT_TAGS{$1}) {
-      push @_, @{$EXPORT_TAGS{$1}};
+    while (defined(my $arg = shift)) {
+      if ($arg =~ /^:(.+)/ && exists $EXPORT_TAGS{$1}) {
+        push @_, @{$EXPORT_TAGS{$1}};
+      }
+      elsif ($exportable{$arg}) {
+        no strict 'refs';
+        $call_srand++;
+        *{"$caller\::$arg"} = \&{"$this\::_$arg"};
+      }
+      else {
+        push @unhandled_args, $arg;
+      }
     }
-    elsif ($arg =~ $importable_subs) {
-      no strict 'refs';
-      *{"$caller\::$arg"} = \&{"$this\::_$arg"};
-      _srand() if ! $srand_called++;
-    }
-    else {
-      push @remaining_args, $arg;
-    }
+
+    _srand() if $call_srand;
   }
 
-  __PACKAGE__->export_to_level(1, $this, @remaining_args);
+  __PACKAGE__->export_to_level(1, $this, @unhandled_args);
 }
 
 sub new {
@@ -102,46 +109,9 @@ sub timeseed {
   shift->seed32($sec * 1_000_000 + $usec);
 }
 
-sub savestate {
-  my $self = shift;
-  my $file = shift; # name or handle
-
-  my $fh = ref $file eq 'GLOB' ? $file : do {
-    open my $fh, '>', $file or return 0;
-    $fh;
-  };
-  $self->mts_savestate($fh);
-}
-
-sub _savestate {
-  my $file = shift; # name or handle
-
-  my $fh = ref $file eq 'GLOB' ? $file : do {
-    open my $fh, '>', $file or return 0;
-    $fh;
-  };
-  mt_savestate($fh);
-}
-
-sub loadstate {
-  my $self = shift;
-  my $file = shift;
-
-  my $fh = ref $file eq 'GLOB' ? $file : do {
-    open my $fh, '<', $file or return 0;
-    $fh;
-  };
-  $self->mts_loadstate($fh);
-}
-
-sub _loadstate {
-  my $file = shift;
-
-  my $fh = ref $file eq 'GLOB' ? $file : do {
-    open my $fh, '<', $file or return 0;
-    $fh;
-  };
-  mt_loadstate($fh);
+sub _timeseed {
+  my ($sec, $usec) = gettimeofday();
+  _seed32($sec * 1_000_000 + $usec);
 }
 
 1;
@@ -154,8 +124,7 @@ __END__
 
 =head1 NAME
 
-Math::Random::MTwist - A fast stateful Mersenne Twister pseudo-random number
-generator
+Math::Random::MTwist - A fast stateful Mersenne Twister pseudo-random number generator.
 
 =head1 SYNOPSIS
 
@@ -179,10 +148,10 @@ generator
   use Math::Random::MTwist qw(:rand); # gives you all of the above
 
   use Math::Random::MTwist qw(rd_exponential rd_triangular rd_normal ...);
-  use Math::Random::MTwist qw(:dist); # gives you alll of the above
+  use Math::Random::MTwist qw(:dist); # gives you all of the above
 
   use Math::Random::MTwist qw(savestate loadstate);
-  use Math::Random::MTwist qw(:state); # gives you alll of the above
+  use Math::Random::MTwist qw(:state); # gives you all of the above
 
 =head1 DESCRIPTION
 
@@ -387,8 +356,7 @@ mtwist C library: Copyright © 2001, 2002, 2010, 2012, 2013 by Geoff Kuenning.
 
 =head1 LICENSE
 
-Perl and XS portion: L<Do What The Fuck You Want To Public
-License|http://wtfpl.net/>.
+Perl and XS portion: L<WTFPL|http://wtfpl.net/>.
 
 mtwist C library: L<LGPL|https://gnu.org/licenses/lgpl.html>
 

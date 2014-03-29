@@ -239,48 +239,6 @@ _rand(double bound = 1)
   OUTPUT:
     RETVAL
 
-int
-mts_savestate(mt_state* state, PerlIO* pio)
-  INIT:
-    FILE* file = PerlIO_exportFILE(pio, NULL);
-  CODE:
-    RETVAL = mts_savestate(file, state);
-    fflush(file);
-    PerlIO_releaseFILE(pio, file);
-  OUTPUT:
-    RETVAL
-
-int
-mt_savestate(PerlIO* pio)
-  INIT:
-    FILE* file = PerlIO_exportFILE(pio, NULL);
-  CODE:
-    RETVAL = mt_savestate(file);
-    fflush(file);
-    PerlIO_releaseFILE(pio, file);
-  OUTPUT:
-    RETVAL
-
-int
-mts_loadstate(mt_state* state, PerlIO* pio)
-  INIT:
-    FILE* file = PerlIO_exportFILE(pio, NULL);
-  CODE:
-    RETVAL = mts_loadstate(file, state);
-    PerlIO_releaseFILE(pio, file);
-  OUTPUT:
-    RETVAL
-
-int
-mt_loadstate(PerlIO* pio)
-  INIT:
-    FILE* file = PerlIO_exportFILE(pio, NULL);
-  CODE:
-    RETVAL = mt_loadstate(file);
-    PerlIO_releaseFILE(pio, file);
-  OUTPUT:
-    RETVAL
-
 double
 rd_exponential(mt_state* state, double mean);
   ALIAS:
@@ -392,3 +350,93 @@ _rd_triangular(double lower, double upper, double mode);
                          : rd_ltriangular(lower, upper, mode);
   OUTPUT:
     RETVAL
+
+#define MT_OPEN_FILE(file_sv, mode, pio, fh) {                       \
+    if (! SvOK(file_sv)) {                                           \
+      warn("File name or handle expected");                          \
+    }                                                                \
+    else if (SvROK(file_sv) && SvTYPE(SvRV(file_sv)) == SVt_PVGV) {  \
+      pio = IoIFP(sv_2io(file_sv));                                  \
+      fh = PerlIO_exportFILE(pio, NULL);                             \
+    }                                                                \
+    else {                                                           \
+      fh = fopen(SvPV_nolen(file_sv), mode);                         \
+    }                                                                \
+}
+
+int
+savestate(mt_state* state, SV* file_sv)
+  INIT:
+    PerlIO* pio = NULL;
+    FILE* fh = NULL;
+  CODE:
+    RETVAL = 0;
+    MT_OPEN_FILE(file_sv, "w", pio, fh);
+    if (fh) {
+      RETVAL = mts_savestate(fh, state);
+      if (pio) {
+        fflush(fh);
+        PerlIO_releaseFILE(pio, fh);
+      }
+      else
+        fclose(fh);
+    }
+  OUTPUT:
+    RETVAL
+
+int
+_savestate(SV* file_sv)
+  INIT:
+    PerlIO* pio = NULL;
+    FILE* fh = NULL;
+  CODE:
+    RETVAL = 0;
+    MT_OPEN_FILE(file_sv, "w", pio, fh);
+    if (fh) {
+      RETVAL = mt_savestate(fh);
+      if (pio) {
+        fflush(fh);
+        PerlIO_releaseFILE(pio, fh);
+      }
+      else
+        fclose(fh);
+    }
+  OUTPUT:
+    RETVAL
+
+int
+loadstate(mt_state* state, SV* file_sv)
+  INIT:
+    PerlIO* pio = NULL;
+    FILE* fh = NULL;
+  CODE:
+    RETVAL = 0;
+    MT_OPEN_FILE(file_sv, "r", pio, fh);
+    if (fh) {
+      RETVAL = mts_loadstate(fh, state);
+      if (pio)
+        PerlIO_releaseFILE(pio, fh);
+      else
+        fclose(fh);
+    }
+  OUTPUT:
+    RETVAL
+
+int
+_loadstate(SV* file_sv)
+  INIT:
+    PerlIO* pio = NULL;
+    FILE* fh = NULL;
+  CODE:
+    RETVAL = 0;
+    MT_OPEN_FILE(file_sv, "r", pio, fh);
+    if (fh) {
+      RETVAL = mt_loadstate(fh);
+      if (pio)
+        PerlIO_releaseFILE(pio, fh);
+      else
+        fclose(fh);
+    }
+  OUTPUT:
+    RETVAL
+

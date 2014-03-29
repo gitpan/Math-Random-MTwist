@@ -1,9 +1,10 @@
 ---
-abstract: unknown
+abstract: 'A fast stateful Mersenne Twister pseudo-random number generator.'
 author:
-  - unknown
+  - 'Carsten Gaebler'
 build_requires:
   ExtUtils::MakeMaker: 0
+  Test::More: 0
 configure_requires:
   ExtUtils::MakeMaker: 0
 dynamic_config: 1
@@ -18,5 +19,5 @@ no_index:
     - t
     - inc
 requires:
-  Test::More: 0
-version: 0.04
+  Time::HiRes: 0
+version: 0.05
