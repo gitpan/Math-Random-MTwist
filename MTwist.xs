@@ -11,6 +11,16 @@
 #include "mtwist/mtwist.c"
 #include "mtwist/randistrs.c"
 
+typedef union {
+  double dbl;
+  char str[8];
+#if defined(UINT64_MAX)
+  uint64_t i64;
+#else
+  uint32_t i32[2];
+#endif
+} int2dbl;
+
 /*
   We copy the seeds from an array reference to a buffer so that mtwist can
   copy the buffer to another buffer. No wonder that computer power must double
@@ -138,7 +148,6 @@ _bestseed()
   PPCODE:
     mt_bestseed();
 
-# The seeds come from XS_unpack_uint32_tPtr
 void
 seedfull(mt_state* state, AV* seeds)
   INIT:
@@ -218,13 +227,13 @@ _irand32()
     RETVAL
 
 double
-rand(mt_state* state, double bound = 1)
+rand(mt_state* state, double bound = 0)
   ALIAS:
     rand32 = 1
   CODE:
-    if (bound == 0)
-      bound = 1;
-    RETVAL = (ix == 0 ? mts_ldrand(state) : mts_drand(state)) * bound;
+    RETVAL = ix == 0 ? mts_ldrand(state) : mts_drand(state);
+    if (bound != 0)
+      RETVAL *= bound;
   OUTPUT:
     RETVAL
 
@@ -233,14 +242,52 @@ _rand(double bound = 1)
   ALIAS:
     _rand32 = 1
   CODE:
-    if (bound == 0)
-      bound = 1;
-    RETVAL = (ix == 0 ? mt_ldrand() : mt_drand()) * bound;
+    RETVAL = ix == 0 ? mt_ldrand() : mt_drand();
+    if (bound != 0)
+      RETVAL *= bound;
   OUTPUT:
     RETVAL
 
+#define RETURN_I2D {         \
+  mPUSHn(i2d.dbl);           \
+  if (GIMME_V == G_ARRAY) {  \
+    EXTEND(SP, 2);           \
+    if (sizeof(UV) >= 8)     \
+      mPUSHu(i2d.i64);       \
+    else                     \
+      mPUSHs(&PL_sv_undef);  \
+    mPUSHp(i2d.str, 8);      \
+  }                          \
+}
+
+void
+rd_double(mt_state* state)
+  INIT:
+    int2dbl i2d;
+  PPCODE:
+#if defined(UINT64_MAX)
+    i2d.i64 = mts_llrand(state);
+#else
+    i2d.i32[0] = mts_lrand(state);
+    i2d.i32[1] = mts_lrand(state);
+#endif
+    RETURN_I2D;
+
+void
+_rd_double()
+  INIT:
+    int2dbl i2d;
+  PPCODE:
+#if defined(UINT64_MAX)
+    i2d.i64 = mt_llrand();
+#else
+    i2d.i32[0] = mt_lrand();
+    i2d.i32[1] = mt_lrand();
+#endif
+    RETURN_I2D
+
 double
-rd_exponential(mt_state* state, double mean);
+rd_exponential(mt_state* state, double mean)
   ALIAS:
     rd_lexponential = 1
   CODE:
@@ -250,7 +297,7 @@ rd_exponential(mt_state* state, double mean);
     RETVAL
 
 double
-_rd_exponential(double mean);
+_rd_exponential(double mean)
   ALIAS:
     _rd_lexponential = 1
   CODE:
@@ -260,7 +307,7 @@ _rd_exponential(double mean);
     RETVAL
 
 double
-rd_erlang(mt_state* state, int k, double mean);
+rd_erlang(mt_state* state, int k, double mean)
   ALIAS:
     rd_lerlang = 1
   CODE:
@@ -270,7 +317,7 @@ rd_erlang(mt_state* state, int k, double mean);
     RETVAL
 
 double
-_rd_erlang(int k, double mean);
+_rd_erlang(int k, double mean)
   ALIAS:
     _rd_lerlang = 1
   CODE:
@@ -280,7 +327,7 @@ _rd_erlang(int k, double mean);
     RETVAL
 
 double
-rd_weibull(mt_state* state, double shape, double scale);
+rd_weibull(mt_state* state, double shape, double scale)
   ALIAS:
     rd_lweibull = 1
     rd_lognormal = 2
@@ -296,7 +343,7 @@ rd_weibull(mt_state* state, double shape, double scale);
     RETVAL
 
 double
-_rd_weibull(double shape, double scale);
+_rd_weibull(double shape, double scale)
   ALIAS:
     _rd_lweibull = 1
     _rd_lognormal = 2
@@ -312,7 +359,7 @@ _rd_weibull(double shape, double scale);
     RETVAL
 
 double
-rd_normal(mt_state* state, double mean, double sigma);
+rd_normal(mt_state* state, double mean, double sigma)
   ALIAS:
     rd_lnormal = 1
   CODE:
@@ -322,7 +369,7 @@ rd_normal(mt_state* state, double mean, double sigma);
     RETVAL
 
 double
-_rd_normal(double mean, double sigma);
+_rd_normal(double mean, double sigma)
   ALIAS:
     _rd_lnormal = 1
   CODE:
@@ -332,7 +379,7 @@ _rd_normal(double mean, double sigma);
     RETVAL
 
 double
-rd_triangular(mt_state* state, double lower, double upper, double mode);
+rd_triangular(mt_state* state, double lower, double upper, double mode)
   ALIAS:
     rd_ltriangular = 1
   CODE:
@@ -342,7 +389,7 @@ rd_triangular(mt_state* state, double lower, double upper, double mode);
     RETVAL
 
 double
-_rd_triangular(double lower, double upper, double mode);
+_rd_triangular(double lower, double upper, double mode)
   ALIAS:
     _rd_ltriangular = 1
   CODE:

@@ -4,10 +4,8 @@
 #else
 #define ATTRIBUTE(attrs)
 #endif
-/*
 static char Rcs_Id[] ATTRIBUTE((used)) =
     "$Id: mtwist.c,v 1.28 2014-01-23 21:11:42-08 geoff Exp $";
-*/
 #endif
 
 /*
@@ -462,11 +460,6 @@ void mts_seedfull(
     uint32_t		seeds[MT_STATE_SIZE])
 					/* Seed array to start from */
     {
-
-#ifdef WIN32
-    dTHX;
-#endif
-
     int			had_nz = 0;	/* NZ if at least one NZ seen */
     int			i;		/* Loop index */
 
@@ -527,11 +520,6 @@ static uint32_t mts_devseed(
     mt_state*		state,		/* State vector to seed */
     char*		seed_dev)	/* Device to seed from */
     {
-
-#ifdef WIN32
-    dTHX;
-#endif
-
     int			bytesread;	/* Byte count read from device */
     int			nextbyte;	/* Index of next byte to read */
     FILE*		ranfile;	/* Access to device */
@@ -611,11 +599,6 @@ static uint32_t mts_devseed(
 void mts_bestseed(
     mt_state*		state)		/* State vector to seed */
     {
-
-#ifdef WIN32
-    dTHX;
-#endif
-
     int			bytesread;	/* Byte count read from device */
     int			nextbyte;	/* Index of next byte to read */
     FILE*		ranfile;	/* Access to device */
@@ -821,11 +804,6 @@ int mts_savestate(
     FILE*		statefile,	/* File to save to */
     mt_state*		state)		/* State to be saved */
     {
-
-#ifdef WIN32
-    dTHX;
-#endif
-
     int			i;		/* Next word to save */
 
     if (!state->initialized)

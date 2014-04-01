@@ -12,12 +12,16 @@ mtwist/mtcctest.cc
 mtwist/mttest.c
 mtwist/mtwist.3
 mtwist/mtwist.c
+mtwist/mtwist.c.orig
 mtwist/mtwist.h
 mtwist/randistrs.3
 mtwist/randistrs.c
+mtwist/randistrs.c.orig
 mtwist/randistrs.h
 mtwist/rdcctest.cc
 mtwist/rdtest.c
 mtwist/README
+patches/mtwist.c.patch
+patches/randistrs.c.patch
 META.yml                                 Module YAML meta-data (added by MakeMaker)
 META.json                                Module JSON meta-data (added by MakeMaker)

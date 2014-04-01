@@ -20,7 +20,6 @@ print $TMAP <<EOTM;
 mt_state*  O_OBJECT
 int32_t    T_IV
 uint32_t   T_UV
-uint32_t*  T_PACKEDARRAY
 int64_t    $int64_type
 uint64_t   $uint64_type
 EOTM

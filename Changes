@@ -1,5 +1,10 @@
 Revision history for Perl extension Math::Random::MTwist.
 
+0.07  2014-04-01
+* Added rd_double().
+* Win32 seems to need dTHX in some places in mtwist.c and randistrs.c.
+* Changed =head2 to =item in POD to keep TOC on CPAN small.
+
 0.06  2014-03-29
 * FIX: MTwist.xs: srand() minimum items is 1 not 0.
 

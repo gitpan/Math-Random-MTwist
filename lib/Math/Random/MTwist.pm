@@ -15,7 +15,7 @@ use constant {
   MT_BESTSEED => \0,
 };
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 our @ISA = 'Exporter';
 our @EXPORT = qw(MT_TIMESEED MT_FASTSEED MT_GOODSEED MT_BESTSEED);
@@ -26,6 +26,7 @@ our %EXPORT_TAGS = (
   'state' => [qw(savestate loadstate)],
   'dist'  => [
     qw(
+        rd_double
         rd_erlang rd_lerlang
         rd_exponential rd_lexponential
         rd_lognormal rd_llognormal
@@ -171,7 +172,9 @@ constants too you must import them through the tag C<:DEFAULT>.
 
 =head1 CONSTRUCTOR
 
-=head2 new()
+=over 2
+
+=item B<new()>
 
 Takes an optional argument specifying the seed. The seed can be a number (will
 be coerced to an unsigned 32-bit integer), an array reference holding up to 624
@@ -183,26 +186,30 @@ below). If no seed is given, C<MT_FASTSEED> is assumed.
 Each instance maintains an individual PRNG state allowing multiple independent
 random number streams.
 
+=back
+
 =head1 SEEDING
 
-=head2 seed32($number)
+=over 2
+
+=item B<seed32($number)>
 
 Seeds the generator with C<$number>. The value will be coerced to an unsigned
 32-bit integer. Calls mtwist's C<mts_seed32new()>. Returns the seed.
 
-=head2 srand($number)
+=item B<srand($number)>
 
 Calls C<seed32> if C<$number> is given, C<fastseed()> otherwise. Returns the
 seed.
 
-=head2 seedfull($seeds)
+=item B<seedfull($seeds)>
 
 Seeds the generator with up to 624 numbers from the I<array reference>
 C<$seeds>. The values are coerced to unsigned 32-bit integers. Missing values
 are padded with zeros, excess values are ignored. Calls mtwist's
 C<mts_seedfull()>.
 
-=head2 timeseed()
+=item B<timeseed()>
 
 Seeds the generator from the current system time obtained with
 C<gettimeofday()> by calculating C<seconds * 1e6 + microseconds> and coercing
@@ -216,7 +223,7 @@ C</dev/random> is available. On Windows the time source chosen by mtwist has
 only millisecond resolution in contrast to microseconds from
 C<Time::HiRes::gettimeofday()>.
 
-=head2 fastseed()
+=item B<fastseed()>
 
 Seeds the generator with 4 bytes read from C</dev/urandom> if available,
 otherwise from the system time (see details under C<timeseed()>). Calls
@@ -224,7 +231,7 @@ mtwist's C<mts_seed()>. Returns the seed.
 
 This method is called by C<new(MT_FASTSEED)>.
 
-=head2 goodseed()
+=item B<goodseed()>
 
 Seeds the generator with 4 bytes read from C</dev/random> if available,
 otherwise from the system time (see details under C<timeseed()>). Calls
@@ -232,7 +239,7 @@ mtwist's C<mts_goodseed()>. Returns the seed.
 
 This method is called by C<new(MT_GOODSEED)>.
 
-=head2 bestseed()
+=item B<bestseed()>
 
 Seeds the generator with 642 integers read from C</dev/random> if
 available. This might take a very long time and is probably not worth the
@@ -241,89 +248,115 @@ back to C<goodseed()>. Calls mtwist's C<mts_bestseed()>.
 
 This method is called by C<new(MT_BESTSEED)>.
 
+=back
+
 =head1 STATE HANDLING
 
-=head2 savestate($filename or $filehandle)
+=over 2
+
+=item B<savestate($filename or $filehandle)>
 
 Saves the current state of the generator to a file given either by a filename
 (file will be truncated) or an open Perl file handle.
 
-Returns 1 on success, 0 on error (you might want to check C<$!> in this case).
+Returns 1 on success, 0 on error (you might want to check C<$!>).
 
-=head2 loadstate($filename or $filehandle)
+=item B<loadstate($filename or $filehandle)>
 
 Loads the state of the generator from a file given either by a filename or an
 open Perl file handle.
 
-Returns 1 on success, 0 on error (you might want to check C<$!> in this case).
+Returns 1 on success, 0 on error (you might want to check C<$!>).
+
+=back
 
 =head1 UNIFORMLY DISTRIBUTED RANDOM NUMBERS
 
-=head2 irand()
+=over 2
+
+=item B<irand()>
 
 Returns a random unsigned integer, 64-bit if your system supports it (see
 C<irand64()>), 32-bit otherwise.
 
-=head2 irand32()
+=item B<irand32()>
 
 Returns a random unsigned 32-bit integer. Calls mtwist's C<mts_lrand()>.
 
-=head2 irand64()
+=item B<irand64()>
 
 If your Perl is 64-bit, returns a 64-bit unsigned integer. If your Perl is
 32-bit but your OS knows the C<uint64_t> type, returns a 64-bit unsigned
 integer coerced to a double (so it's the full 64-bit range but with only 52-bit
 precision). Otherwise it returns undef. Calls mtwist's C<mts_llrand()>.
 
-=head2 rand($bound)
+=item B<rand($bound)>
 
 Returns a random double with 52-bit precision in the range C<[0, $bound)>.
 Calls mtwist's C<mts_ldrand()>.
 
 C<$bound> may be negative. If C<$bound> is omitted or zero it defaults to 1.
 
-=head2 rand32($bound)
+=item B<rand32($bound)>
 
 Returns a random double with 32-bit precision in the range C<[0, $bound)>.
 Slightly faster than rand(). Calls mtwist's C<mts_drand()>.
 
 C<$bound> may be negative. If C<$bound> is omitted or zero it defaults to 1.
 
+=back
+
 =head1 NON-UNIFORMLY DISTRIBUTED RANDOM NUMBERS
 
-The following methods come in two variants: C<B<rd_>xxx> and
-C<B<rd_l>xxx>. They all return a double but the C<B<rd_>xxx> versions provide
-32-bit precision while the C<B<rd_l>xxx> versions provide 52-bit precision at
-the expense of speed.
+With the exception of C<rd_double()> the following methods come in two
+variants: C<B<rd_>xxx> and C<B<rd_l>xxx>. They all return a double but the
+C<B<rd_>xxx> versions provide 32-bit precision while the C<B<rd_l>xxx> versions
+provide 52-bit precision at the expense of speed.
 
-Despite their names they call mtwist's C<rds_xxx> functions if used with the OO
-interface.
+=over 2
 
-=head2 rd_(l)exponential(double mean)
+=item B<rd_double()>
+
+This is kind of a FUNction (that's the "Fun with flags" sort of fun).
+
+It generates a random double in the complete (signed) double range. It does
+that by drawing a random 64-bit integer (if available, otherwise two 32-bit
+integers) and interpreting the bit pattern as a double. That's the same as
+saying C<unpack 'd', pack 'Q', irand64()>. The results follow a Benford
+distribution (each range [2^n, 2^(n+1)[ can hold 2^52 values). Be prepared to
+meet some NaNs and Infs.
+
+In scalar context it returns a double. In list context it returns the double,
+the corresponding integer (undef if your Perl doesn't have 64-bit integers) and
+the packed string representation.
+
+=item B<rd_(l)exponential(double mean)>
 
 Generates an exponential distribution with the given mean.
 
-=head2 rd_(l)erlang(int k, double mean)
+=item B<rd_(l)erlang(int k, double mean)>
 
 Generates an Erlang-k distribution with the given mean.
 
-=head2 rd_(l)weibull(double shape, double scale)
+=item B<rd_(l)weibull(double shape, double scale)>
 
 Generates a Weibull distribution with the given shape and scale.
 
-=head2 rd_(l)normal(double mean, double sigma)
+=item B<rd_(l)normal(double mean, double sigma)>
 
 Generates a normal (Gaussian) distribution with the given mean and standard
 deviation sigma.
 
-=head2 rd_(l)lognormal(double shape, double scale)
+=item B<rd_(l)lognormal(double shape, double scale)>
 
 Generates a log-normal distribution with the given shape and scale.
 
-=head2 rd_(l)triangular(double lower, double upper, double mode)
+=item B<rd_(l)triangular(double lower, double upper, double mode)>
 
 Generates a triangular distribution in the range C<[lower, upper)> with the
 given mode.
+
+=back
 
 =head1 EXPORTS
 
@@ -349,8 +382,8 @@ L<http://www.cs.hmc.edu/~geoff/mtwist.html>
 
 L<Math::Random::MT|https://metacpan.org/pod/Math::Random::MT> and
 L<Math::Random::MT::Auto|https://metacpan.org/pod/Math::Random::MT::Auto> are
-significantly slower than Math::Random::MTwist. On the other hand MRMA has some
-additional sophisticated features.
+significantly slower than Math::Random::MTwist. While MRMA has some additional
+sophisticated features, it depends on non-core modules.
 
 =head1 AUTHOR
 

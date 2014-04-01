@@ -4,10 +4,8 @@
 #else
 #define ATTRIBUTE(attrs)
 #endif
-/*
 static char Rcs_Id[] ATTRIBUTE((used)) =
     "$Id: randistrs.c,v 1.12 2013-01-05 01:18:52-08 geoff Exp $";
-*/
 #endif
 
 /*
@@ -885,11 +883,6 @@ rd_empirical_control* rd_empirical_setup(
     const double*	probs,		/* Probability (weight) table */
     const double*	values)		/* Value for floating distributions */
     {
-
-#ifdef WIN32
-    dTHX;
-#endif
-
     rd_empirical_control* control;	/* Control structure we'll build */
     size_t		i;		/* General loop index */
     size_t		j;		/* Element from stack_high */
@@ -1038,11 +1031,6 @@ rd_empirical_control* rd_empirical_setup(
 void rd_empirical_free(
     rd_empirical_control* control)	/* Structure to free */
     {
-
-#ifdef WIN32
-    dTHX;
-#endif
-
     if (control == NULL)
 	return;
     if (control->cutoff != NULL)
