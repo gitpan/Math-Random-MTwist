@@ -2,9 +2,8 @@
 
 use strict;
 use warnings;
+use Math::Random::MTwist;
 use Test::More tests => 17;
-
-BEGIN { use_ok('Math::Random::MTwist') };
 
 my $mt = Math::Random::MTwist->new(1_000_686_894);
 
@@ -35,3 +34,6 @@ ok($mt->rd_ltriangular(0, 2, 1) =~ /^1\.3103709/, 'rd_ltriangular');
 
 ok($mt->rd_weibull(1.5, 1)  =~ /^0\.7575942/, 'rd_weibull');
 ok($mt->rd_lweibull(1.5, 1) =~ /^0\.5284899/, 'rd_lweibull');
+
+ok($mt->rd_double() =~ /^8.6196948.+e-145$/, 'rd_double');
+

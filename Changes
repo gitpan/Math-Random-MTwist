@@ -1,5 +1,11 @@
 Revision history for Perl extension Math::Random::MTwist.
 
+0.08  2014-04-05
+* Moved timseed() from MTwist.pm to MTwist.xs.
+* Removed Safefree() call from get_seeds_from_av(): Was unnecessary because we
+  croak() anyway and silly because we can't free stack addresses ...
+* More tests.
+
 0.07  2014-04-01
 * Added rd_double().
 * Win32 seems to need dTHX in some places in mtwist.c and randistrs.c.

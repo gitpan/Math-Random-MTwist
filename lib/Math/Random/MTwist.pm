@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 use Exporter;
-use Time::HiRes 'gettimeofday';
+use Time::HiRes;  # for timeseed()
 use XSLoader;
 
 use constant {
@@ -15,7 +15,7 @@ use constant {
   MT_BESTSEED => \0,
 };
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 our @ISA = 'Exporter';
 our @EXPORT = qw(MT_TIMESEED MT_FASTSEED MT_GOODSEED MT_BESTSEED);
@@ -103,16 +103,6 @@ sub new {
   }
 
   $self;
-}
-
-sub timeseed {
-  my ($sec, $usec) = gettimeofday();
-  shift->seed32($sec * 1_000_000 + $usec);
-}
-
-sub _timeseed {
-  my ($sec, $usec) = gettimeofday();
-  _seed32($sec * 1_000_000 + $usec);
 }
 
 1;

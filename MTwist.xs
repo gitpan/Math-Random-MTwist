@@ -27,12 +27,12 @@ typedef union {
   every two years ...
 */
 void get_seeds_from_av(AV* av_seeds, uint32_t* mt_seeds) {
-  dTHX;
-
   int had_nz = 0;
   I32 i, top_index;
   SV** av_seed;
   uint32_t mt_seed;
+
+  dTHX;
 
   top_index = av_len(av_seeds);  // Top array index, not array length!
   if (top_index >= MT_STATE_SIZE)
@@ -46,10 +46,30 @@ void get_seeds_from_av(AV* av_seeds, uint32_t* mt_seeds) {
       had_nz++;
   }
 
-  if (! had_nz) {
-    Safefree(mt_seeds);
+  if (! had_nz)
     croak("seedfull(): Need at least one non-zero seed value");
-  }
+}
+
+uint32_t gettimeofday_in_microseconds(void) {
+  I32 return_count;
+  UV usecs;
+
+  // Who invented those silly cryptic macro names?
+  dTHX;
+  dSP;
+
+  PUSHMARK(SP);
+  return_count = call_pv("Time::HiRes::gettimeofday", G_ARRAY);
+  if (return_count != 2)
+    croak("Time::HiRes::gettimeofday() returned %d instead of 2 values",
+          return_count);
+
+  SPAGAIN;
+  usecs = (UV)POPi;
+  usecs += (UV)POPi * 1000000;
+  PUTBACK;
+
+  return (uint32_t)usecs;  // We discard the overflow.
 }
 
 MODULE = Math::Random::MTwist		PACKAGE = Math::Random::MTwist		
@@ -107,6 +127,22 @@ _srand(uint32_t seed = 0)
       mt_seed32new(seed);
       RETVAL = seed;
     }
+  OUTPUT:
+    RETVAL
+
+uint32_t
+timeseed(mt_state* state)
+  CODE:
+    RETVAL = gettimeofday_in_microseconds();
+    mts_seed32new(state, RETVAL);
+  OUTPUT:
+    RETVAL
+
+uint32_t
+_timeseed()
+  CODE:
+    RETVAL = gettimeofday_in_microseconds();
+    mt_seed32new(RETVAL);
   OUTPUT:
     RETVAL
 
