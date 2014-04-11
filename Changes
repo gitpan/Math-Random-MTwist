@@ -1,5 +1,10 @@
 Revision history for Perl extension Math::Random::MTwist.
 
+0.09  2014-04-11
+* Code cleanup.
+* On Win32 use timeseed() for fast/good/bestseed() and srand() because there is
+  no /dev/(u)random and we don't want mtwist's millisecond-resolution fallback.
+
 0.08  2014-04-05
 * Moved timseed() from MTwist.pm to MTwist.xs.
 * Removed Safefree() call from get_seeds_from_av(): Was unnecessary because we

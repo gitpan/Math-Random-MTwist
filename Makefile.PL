@@ -7,10 +7,12 @@ WriteMakefile(
   AUTHOR        => 'Carsten Gaebler',
   ABSTRACT_FROM => 'lib/Math/Random/MTwist.pm',
   VERSION_FROM  => 'lib/Math/Random/MTwist.pm',
+  MIN_PERL_VERSION => '5.010000',
   PREREQ_PM     => { 'Time::HiRes' => 0 },
   TEST_REQUIRES => { 'Test::More' => 0 },
   INC           => '-I.',
   OBJECT        => '$(O_FILES)',
+  dist          => { TARFLAGS => '--numeric-owner -cvpf' },
 );
 
 my $int64_type = $Config{ivsize} > 4 ? 'T_IV' : 'T_NV';

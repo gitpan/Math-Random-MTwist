@@ -15,7 +15,7 @@ use constant {
   MT_BESTSEED => \0,
 };
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
 our @ISA = 'Exporter';
 our @EXPORT = qw(MT_TIMESEED MT_FASTSEED MT_GOODSEED MT_BESTSEED);
@@ -75,7 +75,7 @@ sub new {
   my $class = shift;
   my $seed = shift;
 
-  my $self = _mts_newstate($class);
+  my $self = new_state($class);
 
   if (! defined $seed) {
     $self->fastseed();
@@ -184,8 +184,8 @@ random number streams.
 
 =item B<seed32($number)>
 
-Seeds the generator with C<$number>. The value will be coerced to an unsigned
-32-bit integer. Calls mtwist's C<mts_seed32new()>. Returns the seed.
+Seeds the generator with C<$number>, coercing it to an unsigned 32-bit
+integer. Calls mtwist's C<mts_seed32new()>. Returns the seed.
 
 =item B<srand($number)>
 
@@ -196,22 +196,8 @@ seed.
 
 Seeds the generator with up to 624 numbers from the I<array reference>
 C<$seeds>. The values are coerced to unsigned 32-bit integers. Missing values
-are padded with zeros, excess values are ignored. Calls mtwist's
-C<mts_seedfull()>.
-
-=item B<timeseed()>
-
-Seeds the generator from the current system time obtained with
-C<gettimeofday()> by calculating C<seconds * 1e6 + microseconds> and coercing
-the result to an unsigned 32-bit integer. Returns the seed.
-
-This method is called by C<new(MT_TIMESEED)>.
-
-It doesn't correspond to any of mtwist's functions. The rationale behind it is
-that mtwist falls back to the system time if neither C</dev/urandom> nor
-C</dev/random> is available. On Windows the time source chosen by mtwist has
-only millisecond resolution in contrast to microseconds from
-C<Time::HiRes::gettimeofday()>.
+are taken as zero, excess values are ignored. Calls mtwist's
+C<mts_seedfull()>. Returns nothing.
 
 =item B<fastseed()>
 
@@ -237,6 +223,21 @@ waiting. If C</dev/random> is unavailable or there was a reading error it falls
 back to C<goodseed()>. Calls mtwist's C<mts_bestseed()>.
 
 This method is called by C<new(MT_BESTSEED)>.
+
+=item B<timeseed()>
+
+Seeds the generator from the current system time obtained from
+C<Time::HiRes::gettimeofday()> by calculating C<seconds * 1e6 + microseconds>
+and coercing the result to an unsigned 32-bit integer. Returns the seed.
+
+This method is called by C<new(MT_TIMESEED)>.
+
+C<timeseed> doesn't correspond to any of mtwist's functions. The rationale
+behind it is that mtwist uses the system time if neither C</dev/urandom> nor
+C</dev/random> is available. On Windows, the time source it uses has only
+millisecond resolution in contrast to microseconds from C<gettimeofday()>, so
+C<fast/good/bestseed()> and C<srand()> (w/o seed argument) call C<timeseed()>
+directly in this case.
 
 =back
 

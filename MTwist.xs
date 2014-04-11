@@ -14,12 +14,97 @@
 typedef union {
   double dbl;
   char str[8];
-#if defined(UINT64_MAX)
+#ifdef UINT64_MAX
   uint64_t i64;
 #else
   uint32_t i32[2];
 #endif
 } int2dbl;
+
+// We calculate gettimeofday() in microseconds and use the lower 32 bits
+// as the seed.
+uint32_t timeseed(mt_state* state) {
+  I32 return_count;
+  UV usecs;
+
+  // Who invented those silly cryptic macro names?
+  dTHX;
+  dSP;
+
+  PUSHMARK(SP);
+  return_count = call_pv("Time::HiRes::gettimeofday", G_ARRAY);
+
+  if (return_count != 2)
+    croak("Time::HiRes::gettimeofday() returned %d instead of 2 values",
+          return_count);
+
+  SPAGAIN;
+  usecs = (UV)POPi;
+  usecs += (UV)POPi * 1000000;
+  PUTBACK;
+
+  if (state)
+    mts_seed32new(state, usecs);
+  else
+    mt_seed32new(usecs);
+
+  return usecs;
+}
+
+uint32_t fastseed(mt_state* state) {
+#ifdef WIN32
+  return timeseed(state);
+#else
+  return state ? mts_seed(state) : mt_seed();
+#endif
+}
+
+uint32_t goodseed(mt_state* state) {
+#ifdef WIN32
+  return timeseed(state);
+#else
+  return state ? mts_goodseed(state) : mt_goodseed();
+#endif
+}
+
+void bestseed(mt_state* state) {
+#ifdef WIN32
+  timeseed(state);
+#else
+  state ? mts_bestseed(state) : mt_bestseed();
+#endif
+}
+
+uint32_t srand50c(mt_state* state, uint32_t* seed) {
+  if (seed == NULL)
+    return fastseed(state);
+
+  if (state)
+    mts_seed32new(state, *seed);
+  else
+    mt_seed32new(*seed);
+
+  return *seed;
+}
+
+double rd_double(mt_state* state) {
+  int2dbl i2d;
+
+#ifdef UINT64_MAX
+  i2d.i64 = state ? mts_llrand(state) : mt_llrand();
+#else
+  if (state) {
+    i2d.i32[0] = mts_lrand(state);
+    i2d.i32[1] = mts_lrand(state);
+  }
+  else {
+    i2d.i32[0] = mt_lrand();
+    i2d.i32[1] = mt_lrand();
+  }
+#endif
+
+  return i2d.dbl;
+}
 
 /*
   We copy the seeds from an array reference to a buffer so that mtwist can
@@ -40,7 +125,7 @@ void get_seeds_from_av(AV* av_seeds, uint32_t* mt_seeds) {
 
   for (i = 0; i <= top_index; i++) {
     av_seed = av_fetch(av_seeds, i, 0);
-    mt_seed = (av_seed != NULL) ? (uint32_t)SvUV(*av_seed) : 0;
+    mt_seed = (av_seed != NULL) ? SvUV(*av_seed) : 0;
     mt_seeds[i] = mt_seed;
     if (mt_seed != 0)
       had_nz++;
@@ -50,34 +135,12 @@ void get_seeds_from_av(AV* av_seeds, uint32_t* mt_seeds) {
     croak("seedfull(): Need at least one non-zero seed value");
 }
 
-uint32_t gettimeofday_in_microseconds(void) {
-  I32 return_count;
-  UV usecs;
-
-  // Who invented those silly cryptic macro names?
-  dTHX;
-  dSP;
-
-  PUSHMARK(SP);
-  return_count = call_pv("Time::HiRes::gettimeofday", G_ARRAY);
-  if (return_count != 2)
-    croak("Time::HiRes::gettimeofday() returned %d instead of 2 values",
-          return_count);
-
-  SPAGAIN;
-  usecs = (UV)POPi;
-  usecs += (UV)POPi * 1000000;
-  PUTBACK;
-
-  return (uint32_t)usecs;  // We discard the overflow.
-}
-
 MODULE = Math::Random::MTwist		PACKAGE = Math::Random::MTwist		
 
 PROTOTYPES: ENABLE
 
 mt_state*
-_mts_newstate(char* CLASS)
+new_state(char* CLASS)
   CODE:
     Newxz(RETVAL, 1, mt_state);
     if (RETVAL == NULL)
@@ -109,85 +172,73 @@ _seed32(uint32_t seed)
 uint32_t
 srand(mt_state* state, uint32_t seed = 0)
   CODE:
-    if (items == 1)
-      RETVAL = mts_seed(state);
-    else {
-      mts_seed32new(state, seed);
-      RETVAL = seed;
-    }
+    RETVAL = srand50c(state, items == 1 ? NULL : &seed);
   OUTPUT:
     RETVAL
 
 uint32_t
 _srand(uint32_t seed = 0)
   CODE:
-    if (items == 0)
-      RETVAL = mt_seed();
-    else {
-      mt_seed32new(seed);
-      RETVAL = seed;
-    }
+    RETVAL = srand50c(NULL, items == 0 ? NULL : &seed);
   OUTPUT:
     RETVAL
 
 uint32_t
 timeseed(mt_state* state)
   CODE:
-    RETVAL = gettimeofday_in_microseconds();
-    mts_seed32new(state, RETVAL);
+    RETVAL = timeseed(state);
   OUTPUT:
     RETVAL
 
 uint32_t
 _timeseed()
   CODE:
-    RETVAL = gettimeofday_in_microseconds();
-    mt_seed32new(RETVAL);
+    RETVAL = timeseed(NULL);
   OUTPUT:
     RETVAL
 
 uint32_t
 fastseed(mt_state* state)
   CODE:
-    RETVAL = mts_seed(state);
+    RETVAL = fastseed(state);
   OUTPUT:
     RETVAL
 
 uint32_t
 _fastseed()
   CODE:
-    RETVAL = mt_seed();
+    RETVAL = fastseed(NULL);
   OUTPUT:
     RETVAL
 
 uint32_t
 goodseed(mt_state* state)
   CODE:
-    RETVAL = mts_goodseed(state);
+    RETVAL = goodseed(state);
   OUTPUT:
     RETVAL
 
 uint32_t
 _goodseed()
   CODE:
-    RETVAL = mt_goodseed();
+    RETVAL = goodseed(NULL);
   OUTPUT:
     RETVAL
 
 void
 bestseed(mt_state* state)
   PPCODE:
-    mts_bestseed(state);
+    bestseed(state);
 
 void
 _bestseed()
   PPCODE:
-    mt_bestseed();
+    bestseed(NULL);
 
 void
 seedfull(mt_state* state, AV* seeds)
   INIT:
-    uint32_t mt_seeds[MT_STATE_SIZE] = { 0 };
+    uint32_t mt_seeds[MT_STATE_SIZE];
   PPCODE:
     get_seeds_from_av(seeds, mt_seeds);
     mts_seedfull(state, mt_seeds);
@@ -195,7 +246,7 @@ seedfull(mt_state* state, AV* seeds)
 void
 _seedfull(AV* seeds)
   INIT:
-    uint32_t mt_seeds[MT_STATE_SIZE] = { 0 };
+    uint32_t mt_seeds[MT_STATE_SIZE];
   PPCODE:
     get_seeds_from_av(seeds, mt_seeds);
     mt_seedfull(mt_seeds);
@@ -301,12 +352,7 @@ rd_double(mt_state* state)
   INIT:
     int2dbl i2d;
   PPCODE:
-#if defined(UINT64_MAX)
-    i2d.i64 = mts_llrand(state);
-#else
-    i2d.i32[0] = mts_lrand(state);
-    i2d.i32[1] = mts_lrand(state);
-#endif
+    i2d.dbl = rd_double(state);
     RETURN_I2D;
 
 void
@@ -314,21 +360,16 @@ _rd_double()
   INIT:
     int2dbl i2d;
   PPCODE:
-#if defined(UINT64_MAX)
-    i2d.i64 = mt_llrand();
-#else
-    i2d.i32[0] = mt_lrand();
-    i2d.i32[1] = mt_lrand();
-#endif
-    RETURN_I2D
+    i2d.dbl = rd_double(NULL);
+    RETURN_I2D;
 
 double
 rd_exponential(mt_state* state, double mean)
   ALIAS:
     rd_lexponential = 1
   CODE:
-      RETVAL = (ix == 0) ? rds_exponential(state, mean)
-                         : rds_lexponential(state, mean);
+    RETVAL = (ix == 0) ? rds_exponential(state, mean)
+                       : rds_lexponential(state, mean);
   OUTPUT:
     RETVAL
 
@@ -337,8 +378,8 @@ _rd_exponential(double mean)
   ALIAS:
     _rd_lexponential = 1
   CODE:
-      RETVAL = (ix == 0) ? rd_exponential(mean)
-                         : rd_lexponential(mean);
+    RETVAL = (ix == 0) ? rd_exponential(mean)
+                       : rd_lexponential(mean);
   OUTPUT:
     RETVAL
 
@@ -347,8 +388,8 @@ rd_erlang(mt_state* state, int k, double mean)
   ALIAS:
     rd_lerlang = 1
   CODE:
-      RETVAL = (ix == 0) ? rds_erlang(state, k, mean)
-                         : rds_lerlang(state, k, mean);
+    RETVAL = (ix == 0) ? rds_erlang(state, k, mean)
+                       : rds_lerlang(state, k, mean);
   OUTPUT:
     RETVAL
 
@@ -357,8 +398,8 @@ _rd_erlang(int k, double mean)
   ALIAS:
     _rd_lerlang = 1
   CODE:
-      RETVAL = (ix == 0) ? rd_erlang(k, mean)
-                         : rd_lerlang(k, mean);
+    RETVAL = (ix == 0) ? rd_erlang(k, mean)
+                       : rd_lerlang(k, mean);
   OUTPUT:
     RETVAL
 
@@ -399,8 +440,8 @@ rd_normal(mt_state* state, double mean, double sigma)
   ALIAS:
     rd_lnormal = 1
   CODE:
-      RETVAL = (ix == 0) ? rds_normal(state, mean, sigma)
-                         : rds_lnormal(state, mean, sigma);
+    RETVAL = (ix == 0) ? rds_normal(state, mean, sigma)
+                       : rds_lnormal(state, mean, sigma);
   OUTPUT:
     RETVAL
 
@@ -409,8 +450,8 @@ _rd_normal(double mean, double sigma)
   ALIAS:
     _rd_lnormal = 1
   CODE:
-      RETVAL = (ix == 0) ? rd_normal(mean, sigma)
-                         : rd_lnormal(mean, sigma);
+    RETVAL = (ix == 0) ? rd_normal(mean, sigma)
+                       : rd_lnormal(mean, sigma);
   OUTPUT:
     RETVAL
 
@@ -419,8 +460,8 @@ rd_triangular(mt_state* state, double lower, double upper, double mode)
   ALIAS:
     rd_ltriangular = 1
   CODE:
-      RETVAL = (ix == 0) ? rds_triangular(state, lower, upper, mode)
-                         : rds_ltriangular(state, lower, upper, mode);
+    RETVAL = (ix == 0) ? rds_triangular(state, lower, upper, mode)
+                       : rds_ltriangular(state, lower, upper, mode);
   OUTPUT:
     RETVAL
 
@@ -429,8 +470,8 @@ _rd_triangular(double lower, double upper, double mode)
   ALIAS:
     _rd_ltriangular = 1
   CODE:
-      RETVAL = (ix == 0) ? rd_triangular(lower, upper, mode)
-                         : rd_ltriangular(lower, upper, mode);
+    RETVAL = (ix == 0) ? rd_triangular(lower, upper, mode)
+                       : rd_ltriangular(lower, upper, mode);
   OUTPUT:
     RETVAL
 
