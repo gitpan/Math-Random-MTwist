@@ -15,14 +15,11 @@ WriteMakefile(
   dist          => { TARFLAGS => '--numeric-owner -cvpf' },
 );
 
-my $int64_type = $Config{ivsize} > 4 ? 'T_IV' : 'T_NV';
-(my $uint64_type = $int64_type) =~ tr/I/U/;
+my $uint64_type = $Config{ivsize} >= 8 ? 'T_UV' : 'T_NV';
 open my $TMAP, '>', 'typemap';
 print $TMAP <<EOTM;
 mt_state*  O_OBJECT
-int32_t    T_IV
 uint32_t   T_UV
-int64_t    $int64_type
 uint64_t   $uint64_type
 EOTM
 

@@ -3,11 +3,11 @@
 use strict;
 use warnings;
 use Math::Random::MTwist qw(:rand :seed :dist);
-use Test::More tests => 17;
-
-srand(1_000_686_894);
+use Test::More tests => 20;
 
 # If you change the order of the tests the expected results will change!
+
+ok(srand(1_000_686_894) == 1_000_686_894, 'srand');
 
 ok(irand32() == 2_390_553_143, 'irand32');
 {
@@ -37,3 +37,11 @@ ok(rd_lweibull(1.5, 1) =~ /^0\.5284899/, 'rd_lweibull');
 
 ok(rd_double() =~ /^8.6196948.+e-145$/, 'rd_double');
 
+{
+  my $seed = 0b1010000100111100011110010000101;
+  my $d1 = do { seed32($seed); rd_double(); };
+  my $d2 = do { seed32($seed); rd_double(0); };
+  my $d3 = do { seed32($seed); (rd_double())[0]; };
+  ok($d1 == $d2, 'rd_double(0)');
+  ok($d2 == $d3, '(rd_double())[0]');
+}

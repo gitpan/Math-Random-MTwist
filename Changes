@@ -1,5 +1,11 @@
 Revision history for Perl extension Math::Random::MTwist.
 
+0.10  2014-04-13
+* Added optional argument to rd_double().
+* Code cleanup.
+* More tests.
+* POD update.
+
 0.09  2014-04-11
 * Code cleanup.
 * On Win32 use timeseed() for fast/good/bestseed() and srand() because there is

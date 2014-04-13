@@ -6,7 +6,6 @@
 #include "ppport.h"
 
 #include <stdio.h>
-#include <string.h>
 
 #include "mtwist/mtwist.c"
 #include "mtwist/randistrs.c"
@@ -14,10 +13,9 @@
 typedef union {
   double dbl;
   char str[8];
+  uint32_t i32[2];
 #ifdef UINT64_MAX
   uint64_t i64;
-#else
-  uint32_t i32[2];
 #endif
 } int2dbl;
 
@@ -135,6 +133,70 @@ void get_seeds_from_av(AV* av_seeds, uint32_t* mt_seeds) {
     croak("seedfull(): Need at least one non-zero seed value");
 }
 
+FILE* open_file_from_sv(SV* file_sv, char* mode, PerlIO** pio) {
+  FILE* fh = NULL;
+
+  dTHX;
+
+  if (! SvOK(file_sv)) {
+    // file_sv is undef
+    warn("Filename or handle expected");
+  }
+  else if (SvROK(file_sv) && SvTYPE(SvRV(file_sv)) == SVt_PVGV) {
+    // file_sv is a Perl filehandle
+    *pio = IoIFP(sv_2io(file_sv));
+    fh = PerlIO_exportFILE(*pio, NULL);
+  }
+  else {
+    // file_sv is a filename
+    fh = fopen(SvPV_nolen(file_sv), mode);
+  }
+
+  return fh;
+}
+
+int savestate(mt_state* state, SV* file_sv) {
+  PerlIO* pio = NULL;
+  FILE* fh = NULL;
+  int RETVAL = 0;
+
+  dTHX;
+
+  fh = open_file_from_sv(file_sv, "w", &pio);
+
+  if (fh) {
+    RETVAL = state ? mts_savestate(fh, state) : mt_savestate(fh);
+    if (pio) {
+      fflush(fh);
+      PerlIO_releaseFILE(pio, fh);
+    }
+    else
+      fclose(fh);
+  }
+
+  return RETVAL;
+}
+
+int loadstate(mt_state* state, SV* file_sv) {
+  PerlIO* pio = NULL;
+  FILE* fh = NULL;
+  int RETVAL = 0;
+
+  dTHX;
+
+  fh = open_file_from_sv(file_sv, "r", &pio);
+
+  if (fh) {
+    RETVAL = state ? mts_loadstate(fh, state) : mt_loadstate(fh);
+    if (pio)
+      PerlIO_releaseFILE(pio, fh);
+    else
+      fclose(fh);
+  }
+
+  return RETVAL;
+}
+
 MODULE = Math::Random::MTwist		PACKAGE = Math::Random::MTwist		
 
 PROTOTYPES: ENABLE
@@ -185,10 +247,6 @@ _srand(uint32_t seed = 0)
 
 uint32_t
 timeseed(mt_state* state)
-  CODE:
-    RETVAL = timeseed(state);
-  OUTPUT:
-    RETVAL
 
 uint32_t
 _timeseed()
@@ -199,10 +257,6 @@ _timeseed()
 
 uint32_t
 fastseed(mt_state* state)
-  CODE:
-    RETVAL = fastseed(state);
-  OUTPUT:
-    RETVAL
 
 uint32_t
 _fastseed()
@@ -213,10 +267,6 @@ _fastseed()
 
 uint32_t
 goodseed(mt_state* state)
-  CODE:
-    RETVAL = goodseed(state);
-  OUTPUT:
-    RETVAL
 
 uint32_t
 _goodseed()
@@ -227,8 +277,6 @@ _goodseed()
 
 void
 bestseed(mt_state* state)
-  PPCODE:
-    bestseed(state);
 
 void
 _bestseed()
@@ -238,7 +286,7 @@ _bestseed()
 void
 seedfull(mt_state* state, AV* seeds)
   INIT:
-    uint32_t mt_seeds[MT_STATE_SIZE];
+    uint32_t mt_seeds[MT_STATE_SIZE] = { 0 };
   PPCODE:
     get_seeds_from_av(seeds, mt_seeds);
     mts_seedfull(state, mt_seeds);
@@ -246,7 +294,7 @@ seedfull(mt_state* state, AV* seeds)
 void
 _seedfull(AV* seeds)
   INIT:
-    uint32_t mt_seeds[MT_STATE_SIZE];
+    uint32_t mt_seeds[MT_STATE_SIZE] = { 0 };
   PPCODE:
     get_seeds_from_av(seeds, mt_seeds);
     mt_seedfull(mt_seeds);
@@ -335,33 +383,53 @@ _rand(double bound = 1)
   OUTPUT:
     RETVAL
 
-#define RETURN_I2D {         \
-  mPUSHn(i2d.dbl);           \
-  if (GIMME_V == G_ARRAY) {  \
-    EXTEND(SP, 2);           \
-    if (sizeof(UV) >= 8)     \
-      mPUSHu(i2d.i64);       \
-    else                     \
-      mPUSHs(&PL_sv_undef);  \
-    mPUSHp(i2d.str, 8);      \
-  }                          \
-}
+#define RETURN_I2D(have_index) { \
+  if (have_index) {              \
+    switch(index) {              \
+    case 0:                      \
+      mPUSHn(i2d.dbl);           \
+      break;                     \
+    case 1:                      \
+      if (sizeof(UV) >= 8)       \
+        mPUSHu(i2d.i64);         \
+      else                       \
+        mPUSHs(&PL_sv_undef);    \
+      break;                     \
+    case 2:                      \
+      mPUSHp(i2d.str, 8);        \
+      break;                     \
+    default:                     \
+      mPUSHs(&PL_sv_undef);      \
+    }                            \
+  }                              \
+  else {                         \
+    mPUSHn(i2d.dbl);             \
+    if (GIMME_V == G_ARRAY) {    \
+      EXTEND(SP, 2);             \
+      if (sizeof(UV) >= 8)       \
+        mPUSHu(i2d.i64);         \
+      else                       \
+        mPUSHs(&PL_sv_undef);    \
+      mPUSHp(i2d.str, 8);        \
+    }                            \
+  }                              \
+}                                \
 
 void
-rd_double(mt_state* state)
+rd_double(mt_state* state, int index = 0)
   INIT:
     int2dbl i2d;
   PPCODE:
     i2d.dbl = rd_double(state);
-    RETURN_I2D;
+    RETURN_I2D(items > 1);
 
 void
-_rd_double()
+_rd_double(int index = 0)
   INIT:
     int2dbl i2d;
   PPCODE:
     i2d.dbl = rd_double(NULL);
-    RETURN_I2D;
+    RETURN_I2D(items != 0);
 
 double
 rd_exponential(mt_state* state, double mean)
@@ -475,92 +543,22 @@ _rd_triangular(double lower, double upper, double mode)
   OUTPUT:
     RETVAL
 
-#define MT_OPEN_FILE(file_sv, mode, pio, fh) {                       \
-    if (! SvOK(file_sv)) {                                           \
-      warn("File name or handle expected");                          \
-    }                                                                \
-    else if (SvROK(file_sv) && SvTYPE(SvRV(file_sv)) == SVt_PVGV) {  \
-      pio = IoIFP(sv_2io(file_sv));                                  \
-      fh = PerlIO_exportFILE(pio, NULL);                             \
-    }                                                                \
-    else {                                                           \
-      fh = fopen(SvPV_nolen(file_sv), mode);                         \
-    }                                                                \
-}
-
 int
 savestate(mt_state* state, SV* file_sv)
-  INIT:
-    PerlIO* pio = NULL;
-    FILE* fh = NULL;
-  CODE:
-    RETVAL = 0;
-    MT_OPEN_FILE(file_sv, "w", pio, fh);
-    if (fh) {
-      RETVAL = mts_savestate(fh, state);
-      if (pio) {
-        fflush(fh);
-        PerlIO_releaseFILE(pio, fh);
-      }
-      else
-        fclose(fh);
-    }
-  OUTPUT:
-    RETVAL
 
 int
 _savestate(SV* file_sv)
-  INIT:
-    PerlIO* pio = NULL;
-    FILE* fh = NULL;
   CODE:
-    RETVAL = 0;
-    MT_OPEN_FILE(file_sv, "w", pio, fh);
-    if (fh) {
-      RETVAL = mt_savestate(fh);
-      if (pio) {
-        fflush(fh);
-        PerlIO_releaseFILE(pio, fh);
-      }
-      else
-        fclose(fh);
-    }
+    RETVAL = savestate(NULL, file_sv);
   OUTPUT:
     RETVAL
 
 int
 loadstate(mt_state* state, SV* file_sv)
-  INIT:
-    PerlIO* pio = NULL;
-    FILE* fh = NULL;
-  CODE:
-    RETVAL = 0;
-    MT_OPEN_FILE(file_sv, "r", pio, fh);
-    if (fh) {
-      RETVAL = mts_loadstate(fh, state);
-      if (pio)
-        PerlIO_releaseFILE(pio, fh);
-      else
-        fclose(fh);
-    }
-  OUTPUT:
-    RETVAL
 
 int
 _loadstate(SV* file_sv)
-  INIT:
-    PerlIO* pio = NULL;
-    FILE* fh = NULL;
   CODE:
-    RETVAL = 0;
-    MT_OPEN_FILE(file_sv, "r", pio, fh);
-    if (fh) {
-      RETVAL = mt_loadstate(fh);
-      if (pio)
-        PerlIO_releaseFILE(pio, fh);
-      else
-        fclose(fh);
-    }
+    RETVAL = loadstate(NULL, file_sv);
   OUTPUT:
     RETVAL
-

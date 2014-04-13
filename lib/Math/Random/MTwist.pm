@@ -15,7 +15,7 @@ use constant {
   MT_BESTSEED => \0,
 };
 
-our $VERSION = '0.09';
+our $VERSION = '0.10';
 
 our @ISA = 'Exporter';
 our @EXPORT = qw(MT_TIMESEED MT_FASTSEED MT_GOODSEED MT_BESTSEED);
@@ -48,7 +48,7 @@ sub import {
 
   if (@_) {
     my $caller = caller;
-    my $call_srand = 0;
+    my $need4seed = 0;
     my %exportable = map +($_ => 1), map @$_, values %EXPORT_TAGS;
 
     while (defined(my $arg = shift)) {
@@ -57,7 +57,7 @@ sub import {
       }
       elsif ($exportable{$arg}) {
         no strict 'refs';
-        $call_srand++;
+        $need4seed++;
         *{"$caller\::$arg"} = \&{"$this\::_$arg"};
       }
       else {
@@ -65,7 +65,7 @@ sub import {
       }
     }
 
-    _srand() if $call_srand;
+    _fastseed() if $need4seed;
   }
 
   __PACKAGE__->export_to_level(1, $this, @unhandled_args);
@@ -151,27 +151,31 @@ library. It provides several seeding methods, an independent state per OO
 instance and various random number distributions.
 
 All functions are available through a function-oriented interface and an
-object-oriented interface. If you use the function-oriented interface the
-generator maintains a single global state while with the OO interface each
-instance has its individual state.
+object-oriented interface. The function-oriented interface maintains a single
+global state while with the OO interface each instance has its individual
+state.
 
 The function-oriented interface provides drop-in replacements for Perl's
-built-in C<rand()> and C<srand()> functions. If you C<use> the module with an
-import list C<srand()> is called once automatically. If you need the C<MT_>
-constants too you must import them through the tag C<:DEFAULT>.
+built-in C<rand()> and C<srand()> functions.
+
+If you C<use> the module with an import list, C<fastseed()> is called once
+automatically. In this case, if you need the C<MT_> constants, you must import
+them explicitly through the C<:DEFAULT> tag.
 
 =head1 CONSTRUCTOR
 
 =over 2
 
-=item B<new()>
+=item B<new()>, B<new($seed)>
 
-Takes an optional argument specifying the seed. The seed can be a number (will
-be coerced to an unsigned 32-bit integer), an array reference holding up to 624
-such numbers (missing values are padded with zeros, excess values are ignored)
-or one of the special values C<MT_TIMESEED>, C<MT_FASTSEED>, C<MT_GOODSEED> or
-C<MT_BESTSEED> that choose one of the corresponding seeding methods (see
-below). If no seed is given, C<MT_FASTSEED> is assumed.
+Takes an optional argument specifying the seed. If you omit the seed,
+C<MT_FASTSEED> is the default.
+
+The seed can be a number (will be coerced to an unsigned 32-bit integer), an
+array reference holding up to 624 such numbers (missing values are padded with
+zeros, excess values are ignored) or one of the special values C<MT_TIMESEED>,
+C<MT_FASTSEED>, C<MT_GOODSEED> or C<MT_BESTSEED> that choose one of the
+corresponding seeding methods (see below).
 
 Each instance maintains an individual PRNG state allowing multiple independent
 random number streams.
@@ -187,7 +191,7 @@ random number streams.
 Seeds the generator with C<$number>, coercing it to an unsigned 32-bit
 integer. Calls mtwist's C<mts_seed32new()>. Returns the seed.
 
-=item B<srand($number)>
+=item B<srand()>, B<srand($number)>
 
 Calls C<seed32> if C<$number> is given, C<fastseed()> otherwise. Returns the
 seed.
@@ -281,14 +285,14 @@ If your Perl is 64-bit, returns a 64-bit unsigned integer. If your Perl is
 integer coerced to a double (so it's the full 64-bit range but with only 52-bit
 precision). Otherwise it returns undef. Calls mtwist's C<mts_llrand()>.
 
-=item B<rand($bound)>
+=item B<rand()>, B<rand($bound)>
 
 Returns a random double with 52-bit precision in the range C<[0, $bound)>.
 Calls mtwist's C<mts_ldrand()>.
 
 C<$bound> may be negative. If C<$bound> is omitted or zero it defaults to 1.
 
-=item B<rand32($bound)>
+=item B<rand32()>, B<rand32($bound)>
 
 Returns a random double with 32-bit precision in the range C<[0, $bound)>.
 Slightly faster than rand(). Calls mtwist's C<mts_drand()>.
@@ -306,7 +310,7 @@ provide 52-bit precision at the expense of speed.
 
 =over 2
 
-=item B<rd_double()>
+=item B<rd_double()>, B<rd_double($index)>
 
 This is kind of a FUNction (that's the "Fun with flags" sort of fun).
 
@@ -320,6 +324,10 @@ meet some NaNs and Infs.
 In scalar context it returns a double. In list context it returns the double,
 the corresponding integer (undef if your Perl doesn't have 64-bit integers) and
 the packed string representation.
+
+For convenience, you can call B<rd_double()> with and optional argument
+B<$index> to get the same result as with B<(rd_double())[$index]>, just a bit
+more efficiently.
 
 =item B<rd_(l)exponential(double mean)>
 
@@ -373,8 +381,8 @@ L<http://www.cs.hmc.edu/~geoff/mtwist.html>
 
 L<Math::Random::MT|https://metacpan.org/pod/Math::Random::MT> and
 L<Math::Random::MT::Auto|https://metacpan.org/pod/Math::Random::MT::Auto> are
-significantly slower than Math::Random::MTwist. While MRMA has some additional
-sophisticated features, it depends on non-core modules.
+significantly slower than Math::Random::MTwist. MRMA has some additional
+sophisticated features but it depends on non-core modules.
 
 =head1 AUTHOR
 
