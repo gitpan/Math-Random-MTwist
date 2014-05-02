@@ -15,7 +15,7 @@ use constant {
   MT_BESTSEED => \0,
 };
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 our @ISA = 'Exporter';
 our @EXPORT = qw(MT_TIMESEED MT_FASTSEED MT_GOODSEED MT_BESTSEED);
@@ -33,8 +33,11 @@ our %EXPORT_TAGS = (
         rd_normal rd_lnormal
         rd_triangular rd_ltriangular
         rd_weibull rd_lweibull
-    )],
+    )
+  ],
 );
+
+$EXPORT_TAGS{all} = [ map @$_, values %EXPORT_TAGS ];
 
 XSLoader::load('Math::Random::MTwist', $VERSION);
 
@@ -49,7 +52,7 @@ sub import {
   if (@_) {
     my $caller = caller;
     my $need4seed = 0;
-    my %exportable = map +($_ => 1), map @$_, values %EXPORT_TAGS;
+    my %exportable = map +($_ => 1), @{$EXPORT_TAGS{all}};
 
     while (defined(my $arg = shift)) {
       if ($arg =~ /^:(.+)/ && exists $EXPORT_TAGS{$1}) {
@@ -143,6 +146,8 @@ Math::Random::MTwist - A fast stateful Mersenne Twister pseudo-random number gen
 
   use Math::Random::MTwist qw(savestate loadstate);
   use Math::Random::MTwist qw(:state); # gives you all of the above
+
+  use Math::Random::MTwist qw(:all); # import all functions
 
 =head1 DESCRIPTION
 

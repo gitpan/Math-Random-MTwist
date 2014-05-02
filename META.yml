@@ -21,4 +21,4 @@ no_index:
 requires:
   Time::HiRes: 0
   perl: 5.010000
-version: 0.10
+version: 0.11

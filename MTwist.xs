@@ -5,8 +5,6 @@
 
 #include "ppport.h"
 
-#include <stdio.h>
-
 #include "mtwist/mtwist.c"
 #include "mtwist/randistrs.c"
 
@@ -19,9 +17,39 @@ typedef union {
 #endif
 } int2dbl;
 
+/*
+  We copy the seeds from an array reference to a buffer so that mtwist can
+  copy the buffer to another buffer. No wonder that computer power must double
+  every two years ...
+
+  We assume that mt_seeds[] has been initialized with zeros.
+*/
+static void get_seeds_from_av(AV* av_seeds, uint32_t* mt_seeds) {
+  I32 i;
+  SV** av_seed;
+  uint32_t had_nz = 0;  // non-zero if we had at least one non-zero seed
+
+  dTHX;
+
+  i = av_len(av_seeds);  // Top array index, not array length!
+  if (i >= MT_STATE_SIZE)
+    i = MT_STATE_SIZE - 1;
+
+  for (; i >= 0; i--) {
+    av_seed = av_fetch(av_seeds, i, 0);
+    if (av_seed != NULL) {
+      mt_seeds[i] = SvUV(*av_seed);
+      had_nz |= mt_seeds[i];
+    }
+  }
+
+  if (! had_nz)
+    croak("seedfull(): Need at least one non-zero seed value");
+}
+
 // We calculate gettimeofday() in microseconds and use the lower 32 bits
 // as the seed.
-uint32_t timeseed(mt_state* state) {
+static uint32_t timeseed(mt_state* state) {
   I32 return_count;
   UV usecs;
 
@@ -37,8 +65,8 @@ uint32_t timeseed(mt_state* state) {
           return_count);
 
   SPAGAIN;
-  usecs = (UV)POPi;
-  usecs += (UV)POPi * 1000000;
+  usecs = POPu;
+  usecs += POPu * 1000000;
   PUTBACK;
 
   if (state)
@@ -49,7 +77,7 @@ uint32_t timeseed(mt_state* state) {
   return usecs;
 }
 
-uint32_t fastseed(mt_state* state) {
+static inline uint32_t fastseed(mt_state* state) {
 #ifdef WIN32
   return timeseed(state);
 #else
@@ -57,7 +85,7 @@ uint32_t fastseed(mt_state* state) {
 #endif
 }
 
-uint32_t goodseed(mt_state* state) {
+static inline uint32_t goodseed(mt_state* state) {
 #ifdef WIN32
   return timeseed(state);
 #else
@@ -65,7 +93,7 @@ uint32_t goodseed(mt_state* state) {
 #endif
 }
 
-void bestseed(mt_state* state) {
+static inline void bestseed(mt_state* state) {
 #ifdef WIN32
   timeseed(state);
 #else
@@ -73,7 +101,18 @@ void bestseed(mt_state* state) {
 #endif
 }
 
-uint32_t srand50c(mt_state* state, uint32_t* seed) {
+static inline void seedfull(mt_state* state, AV* seeds) {
+  uint32_t mt_seeds[MT_STATE_SIZE] = { 0 };
+
+  get_seeds_from_av(seeds, mt_seeds);
+
+  if (state)
+    mts_seedfull(state, mt_seeds);
+  else
+    mt_seedfull(mt_seeds);
+}
+
+static inline uint32_t srand50c(mt_state* state, uint32_t* seed) {
   if (seed == NULL)
     return fastseed(state);
 
@@ -85,7 +124,7 @@ uint32_t srand50c(mt_state* state, uint32_t* seed) {
   return *seed;
 }
 
-double rd_double(mt_state* state) {
+static inline int2dbl rd_double(mt_state* state) {
   int2dbl i2d;
 
 #ifdef UINT64_MAX
@@ -101,39 +140,10 @@ double rd_double(mt_state* state) {
   }
 #endif
 
-  return i2d.dbl;
+  return i2d;
 }
 
-/*
-  We copy the seeds from an array reference to a buffer so that mtwist can
-  copy the buffer to another buffer. No wonder that computer power must double
-  every two years ...
-*/
-void get_seeds_from_av(AV* av_seeds, uint32_t* mt_seeds) {
-  int had_nz = 0;
-  I32 i, top_index;
-  SV** av_seed;
-  uint32_t mt_seed;
-
-  dTHX;
-
-  top_index = av_len(av_seeds);  // Top array index, not array length!
-  if (top_index >= MT_STATE_SIZE)
-    top_index = MT_STATE_SIZE - 1;
-
-  for (i = 0; i <= top_index; i++) {
-    av_seed = av_fetch(av_seeds, i, 0);
-    mt_seed = (av_seed != NULL) ? SvUV(*av_seed) : 0;
-    mt_seeds[i] = mt_seed;
-    if (mt_seed != 0)
-      had_nz++;
-  }
-
-  if (! had_nz)
-    croak("seedfull(): Need at least one non-zero seed value");
-}
-
-FILE* open_file_from_sv(SV* file_sv, char* mode, PerlIO** pio) {
+static FILE* open_file_from_sv(SV* file_sv, char* mode, PerlIO** pio) {
   FILE* fh = NULL;
 
   dTHX;
@@ -155,7 +165,7 @@ FILE* open_file_from_sv(SV* file_sv, char* mode, PerlIO** pio) {
   return fh;
 }
 
-int savestate(mt_state* state, SV* file_sv) {
+static int savestate(mt_state* state, SV* file_sv) {
   PerlIO* pio = NULL;
   FILE* fh = NULL;
   int RETVAL = 0;
@@ -177,7 +187,7 @@ int savestate(mt_state* state, SV* file_sv) {
   return RETVAL;
 }
 
-int loadstate(mt_state* state, SV* file_sv) {
+static int loadstate(mt_state* state, SV* file_sv) {
   PerlIO* pio = NULL;
   FILE* fh = NULL;
   int RETVAL = 0;
@@ -197,7 +207,7 @@ int loadstate(mt_state* state, SV* file_sv) {
   return RETVAL;
 }
 
-MODULE = Math::Random::MTwist		PACKAGE = Math::Random::MTwist		
+MODULE = Math::Random::MTwist		PACKAGE = Math::Random::MTwist
 
 PROTOTYPES: ENABLE
 
@@ -285,19 +295,13 @@ _bestseed()
 
 void
 seedfull(mt_state* state, AV* seeds)
-  INIT:
-    uint32_t mt_seeds[MT_STATE_SIZE] = { 0 };
   PPCODE:
-    get_seeds_from_av(seeds, mt_seeds);
-    mts_seedfull(state, mt_seeds);
+    seedfull(state, seeds);
 
 void
 _seedfull(AV* seeds)
-  INIT:
-    uint32_t mt_seeds[MT_STATE_SIZE] = { 0 };
   PPCODE:
-    get_seeds_from_av(seeds, mt_seeds);
-    mt_seedfull(mt_seeds);
+    seedfull(NULL, seeds);
 
 #if defined(UINT64_MAX)
 uint64_t
@@ -367,18 +371,18 @@ rand(mt_state* state, double bound = 0)
     rand32 = 1
   CODE:
     RETVAL = ix == 0 ? mts_ldrand(state) : mts_drand(state);
-    if (bound != 0)
+    if (bound)
       RETVAL *= bound;
   OUTPUT:
     RETVAL
 
 double
-_rand(double bound = 1)
+_rand(double bound = 0)
   ALIAS:
     _rand32 = 1
   CODE:
     RETVAL = ix == 0 ? mt_ldrand() : mt_drand();
-    if (bound != 0)
+    if (bound)
       RETVAL *= bound;
   OUTPUT:
     RETVAL
@@ -420,7 +424,7 @@ rd_double(mt_state* state, int index = 0)
   INIT:
     int2dbl i2d;
   PPCODE:
-    i2d.dbl = rd_double(state);
+    i2d = rd_double(state);
     RETURN_I2D(items > 1);
 
 void
@@ -428,7 +432,7 @@ _rd_double(int index = 0)
   INIT:
     int2dbl i2d;
   PPCODE:
-    i2d.dbl = rd_double(NULL);
+    i2d = rd_double(NULL);
     RETURN_I2D(items != 0);
 
 double
@@ -482,7 +486,7 @@ rd_weibull(mt_state* state, double shape, double scale)
       case 0:  RETVAL = rds_weibull(state, shape, scale); break;
       case 1:  RETVAL = rds_lweibull(state, shape, scale); break;
       case 2:  RETVAL = rds_lognormal(state, shape, scale); break;
-      default: RETVAL = rds_llognormal(state, shape, scale); break;
+      default: RETVAL = rds_llognormal(state, shape, scale);
     }
   OUTPUT:
     RETVAL
@@ -498,7 +502,7 @@ _rd_weibull(double shape, double scale)
       case 0:  RETVAL = rd_weibull(shape, scale); break;
       case 1:  RETVAL = rd_lweibull(shape, scale); break;
       case 2:  RETVAL = rd_lognormal(shape, scale); break;
-      default: RETVAL = rd_llognormal(shape, scale); break;
+      default: RETVAL = rd_llognormal(shape, scale);
     }
   OUTPUT:
     RETVAL

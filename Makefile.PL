@@ -30,10 +30,10 @@ O_OBJECT
 
 INPUT
 O_OBJECT
-  if( sv_isobject($arg) && (SvTYPE(SvRV($arg)) == SVt_PVMG) )
-    $var = ($type)SvIV((SV*)SvRV( $arg ));
-  else {
+  if( !sv_isobject($arg) || (SvTYPE(SvRV($arg)) != SVt_PVMG) ) {
     warn( \"${Package}::$func_name() -- $var is not a blessed SV reference\" );
     XSRETURN_UNDEF;
   }
+  $var = ($type)SvIV((SV*)SvRV($arg));
+  *$var = *$var; // tell the compiler that $var is not NULL
 );
