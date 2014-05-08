@@ -15,7 +15,7 @@ use constant {
   MT_BESTSEED => \0,
 };
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 our @ISA = 'Exporter';
 our @EXPORT = qw(MT_TIMESEED MT_FASTSEED MT_GOODSEED MT_BESTSEED);
@@ -23,7 +23,7 @@ our @EXPORT_OK = @EXPORT;
 our %EXPORT_TAGS = (
   'rand'  => [qw(srand rand rand32 rand64 irand irand32 irand64)],
   'seed'  => [qw(seed32 seedfull timeseed fastseed goodseed bestseed)],
-  'state' => [qw(savestate loadstate)],
+  'state' => [qw(savestate loadstate getstate setstate)],
   'dist'  => [
     qw(
         rd_double
@@ -144,7 +144,7 @@ Math::Random::MTwist - A fast stateful Mersenne Twister pseudo-random number gen
   use Math::Random::MTwist qw(rd_exponential rd_triangular rd_normal ...);
   use Math::Random::MTwist qw(:dist); # gives you all of the above
 
-  use Math::Random::MTwist qw(savestate loadstate);
+  use Math::Random::MTwist qw(savestate loadstate getstate setstate);
   use Math::Random::MTwist qw(:state); # gives you all of the above
 
   use Math::Random::MTwist qw(:all); # import all functions
@@ -152,20 +152,19 @@ Math::Random::MTwist - A fast stateful Mersenne Twister pseudo-random number gen
 =head1 DESCRIPTION
 
 Math::Random::MTwist is a Perl interface to Geoff Kuenning's mtwist C
-library. It provides several seeding methods, an independent state per OO
-instance and various random number distributions.
+library. It provides several seeding methods and various random number
+distributions.
 
 All functions are available through a function-oriented interface and an
 object-oriented interface. The function-oriented interface maintains a single
-global state while with the OO interface each instance has its individual
-state.
+global state while the OO interface gives you an individual state per instance.
 
 The function-oriented interface provides drop-in replacements for Perl's
 built-in C<rand()> and C<srand()> functions.
 
-If you C<use> the module with an import list, C<fastseed()> is called once
-automatically. In this case, if you need the C<MT_> constants, you must import
-them explicitly through the C<:DEFAULT> tag.
+If you C<use> the module with an import list, the global state is seeded
+automatically using C<fastseed()>. In this case, if you need the C<MT_>
+constants, you must import them explicitly through the C<:DEFAULT> tag.
 
 =head1 CONSTRUCTOR
 
@@ -268,7 +267,24 @@ open Perl file handle.
 
 Returns 1 on success, 0 on error (you might want to check C<$!>).
 
+=item B<getstate()>
+
+Returns the current state of the generator as a binary string.
+
+=item B<setstate($string)>
+
+Sets the state of the generator from C<$string>, which you should have obtained
+with C<getstate()>.
+
 =back
+
+C<savestate()> and C<loadstate()> are portable because they save the state as
+decimal numbers. C<getstate()> and C<setstate()> are not portable because they
+simply use a memory dump for laziness reasons.
+
+However, depending on your system's architecture, you can convert C<getstate()>
+to C<savestate()> format using something like C<join ' ', (reverse unpack 'L*',
+getstate())[2..625,1];>.
 
 =head1 UNIFORMLY DISTRIBUTED RANDOM NUMBERS
 
@@ -364,8 +380,40 @@ given mode.
 
 =head1 EXPORTS
 
-The module exports the constants MT_TIMESEED, MT_FASTSEED, MT_GOODSEED and
-MT_BESTSEED that can be used as an argument to the constructor.
+By default the module exports the constants MT_TIMESEED, MT_FASTSEED,
+MT_GOODSEED and MT_BESTSEED that can be used as an argument to the constructor.
+
+The following export tags are available:
+
+=over 2
+
+=item B<:dist>
+
+rd_double rd_erlang rd_lerlang rd_exponential rd_lexponential rd_lognormal
+rd_llognormal rd_normal rd_lnormal rd_triangular rd_ltriangular rd_weibull
+rd_lweibull
+
+=item B<:rand>
+
+rand rand rand32 rand64 irand irand32 irand64
+
+=item B<:seed>
+
+seed32 seedfull timeseed fastseed goodseed bestseed
+
+=item B<:state>
+
+savestate loadstate getstate setstate
+
+=item B<:all>
+
+All of the above.
+
+=item B<:DEFAULT>
+
+MT_TIMESEED MT_FASTSEED MT_GOODSEED MT_BESTSEED
+
+=back
 
 =head1 NOTES
 

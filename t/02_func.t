@@ -2,8 +2,8 @@
 
 use strict;
 use warnings;
-use Math::Random::MTwist qw(:rand :seed :dist);
-use Test::More tests => 20;
+use Math::Random::MTwist qw(:rand :seed :dist :state);
+use Test::More tests => 23;
 
 # If you change the order of the tests the expected results will change!
 
@@ -44,4 +44,12 @@ ok(rd_double() =~ /^8.6196948.+e-145$/, 'rd_double');
   my $d3 = do { seed32($seed); (rd_double())[0]; };
   ok($d1 == $d2, 'rd_double(0)');
   ok($d2 == $d3, '(rd_double())[0]');
+}
+
+{
+  my $state = getstate();
+  ok(length $state > 624*4, 'getstate');
+  ok(irand32() == 2_419_637_362, 'irand32 before setstate');
+  setstate($state);
+  ok(irand32() == 2_419_637_362, 'irand32 after setstate');
 }

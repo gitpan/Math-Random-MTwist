@@ -27,7 +27,7 @@ typedef union {
 static void get_seeds_from_av(AV* av_seeds, uint32_t* mt_seeds) {
   I32 i;
   SV** av_seed;
-  uint32_t had_nz = 0;  // non-zero if we had at least one non-zero seed
+  uint32_t had_nz = 0;
 
   dTHX;
 
@@ -36,11 +36,8 @@ static void get_seeds_from_av(AV* av_seeds, uint32_t* mt_seeds) {
     i = MT_STATE_SIZE - 1;
 
   for (; i >= 0; i--) {
-    av_seed = av_fetch(av_seeds, i, 0);
-    if (av_seed != NULL) {
-      mt_seeds[i] = SvUV(*av_seed);
-      had_nz |= mt_seeds[i];
-    }
+    if ((av_seed = av_fetch(av_seeds, i, 0)))
+      had_nz |= mt_seeds[i] = SvUV(*av_seed);
   }
 
   if (! had_nz)
@@ -206,6 +203,24 @@ static int loadstate(mt_state* state, SV* file_sv) {
 
   return RETVAL;
 }
+
+static void set_state_from_sv(mt_state* state, SV* sv_state) {
+  char* pv_state;
+  STRLEN len;
+
+  dTHX;
+
+  if (!SvOK(sv_state) || !SvPOK(sv_state))
+    croak("State must be a string");
+
+  pv_state = SvPV(sv_state, len);
+
+  if (len != sizeof(mt_state))
+    croak("State must be exactly %d bytes, not %d", sizeof(mt_state), len);
+
+  Copy(pv_state, state, 1, mt_state);
+}
+
 
 MODULE = Math::Random::MTwist		PACKAGE = Math::Random::MTwist
 
@@ -566,3 +581,27 @@ _loadstate(SV* file_sv)
     RETVAL = loadstate(NULL, file_sv);
   OUTPUT:
     RETVAL
+
+SV*
+getstate(mt_state* state)
+  CODE:
+    RETVAL = newSVpvn((char*)state, sizeof(mt_state));
+  OUTPUT:
+    RETVAL
+
+SV*
+_getstate()
+  CODE:
+    RETVAL = newSVpvn((char*)&mt_default_state, sizeof(mt_state));
+  OUTPUT:
+    RETVAL
+
+void
+setstate(mt_state* state, SV* sv_state)
+  PPCODE:
+    set_state_from_sv(state, sv_state);
+
+void
+_setstate(SV* sv_state)
+  PPCODE:
+    set_state_from_sv(&mt_default_state, sv_state);

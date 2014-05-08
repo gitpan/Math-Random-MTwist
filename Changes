@@ -1,6 +1,12 @@
 Revision history for Perl extension Math::Random::MTwist.
 
+0.12  2014-05-08
+* Added getstate() and setstate().
+* More tests.
+* POD update.
+
 0.11  2014-05-02
+* Added :all export tag.
 * Some optimizations. In particular, we let the compiler know that we know that
   the state argument cannot be NULL. This way we can efficiently inline some
   functions.
@@ -17,7 +23,7 @@ Revision history for Perl extension Math::Random::MTwist.
   no /dev/(u)random and we don't want mtwist's millisecond-resolution fallback.
 
 0.08  2014-04-05
-* Moved timseed() from MTwist.pm to MTwist.xs.
+* Moved timeseed() from MTwist.pm to MTwist.xs.
 * Removed Safefree() call from get_seeds_from_av(): Was unnecessary because we
   croak() anyway and silly because we can't free stack addresses ...
 * More tests.
