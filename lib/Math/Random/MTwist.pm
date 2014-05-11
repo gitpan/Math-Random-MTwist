@@ -15,7 +15,7 @@ use constant {
   MT_BESTSEED => \0,
 };
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 
 our @ISA = 'Exporter';
 our @EXPORT = qw(MT_TIMESEED MT_FASTSEED MT_GOODSEED MT_BESTSEED);
@@ -283,8 +283,8 @@ decimal numbers. C<getstate()> and C<setstate()> are not portable because they
 simply use a memory dump for laziness reasons.
 
 However, depending on your system's architecture, you can convert C<getstate()>
-to C<savestate()> format using something like C<join ' ', (reverse unpack 'L*',
-getstate())[2..625,1];>.
+to C<savestate()> format using something like C<join ' ', (reverse unpack
+'L624i', getstate())[1..624,0];>.
 
 =head1 UNIFORMLY DISTRIBUTED RANDOM NUMBERS
 
@@ -340,13 +340,14 @@ that by drawing a random 64-bit integer (if available, otherwise two 32-bit
 integers) and interpreting the bit pattern as a double. That's the same as
 saying C<unpack 'd', pack 'Q', irand64()>. The results follow a Benford
 distribution (each range [2^n, 2^(n+1)[ can hold 2^52 values). Be prepared to
-meet some NaNs and Infs.
+meet some NaNs, Infs and subnormals (see POSIX::2008 for floating point check
+functions).
 
 In scalar context it returns a double. In list context it returns the double,
 the corresponding integer (undef if your Perl doesn't have 64-bit integers) and
 the packed string representation.
 
-For convenience, you can call B<rd_double()> with and optional argument
+For convenience, you can call B<rd_double()> with an optional argument
 B<$index> to get the same result as with B<(rd_double())[$index]>, just a bit
 more efficiently.
 

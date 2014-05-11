@@ -18,12 +18,13 @@ typedef union {
 } int2dbl;
 
 /*
-  We copy the seeds from an array reference to a buffer so that mtwist can
-  copy the buffer to another buffer. No wonder that computer power must double
-  every two years ...
-
-  We assume that mt_seeds[] has been initialized with zeros.
-*/
+ * We copy the seeds from an array reference to a buffer so that mtwist can
+ * copy the buffer to another buffer. No wonder that computer power must double
+ * every two years ...
+ *
+ *
+ * We assume that mt_seeds[] has been initialized with zeros.
+ */
 static void get_seeds_from_av(AV* av_seeds, uint32_t* mt_seeds) {
   I32 i;
   SV** av_seed;
@@ -31,7 +32,13 @@ static void get_seeds_from_av(AV* av_seeds, uint32_t* mt_seeds) {
 
   dTHX;
 
-  i = av_len(av_seeds);  // Top array index, not array length!
+  /*
+   * Two classic examples of badly chosen identifier names:
+   * av_len() does not return the array length but the top array index.
+   * MT_STATE_SIZE is not sizeof(mt_state) but the length of the state vector.
+   */
+
+  i = av_len(av_seeds);
   if (i >= MT_STATE_SIZE)
     i = MT_STATE_SIZE - 1;
 
@@ -205,18 +212,25 @@ static int loadstate(mt_state* state, SV* file_sv) {
 }
 
 static void set_state_from_sv(mt_state* state, SV* sv_state) {
-  char* pv_state;
   STRLEN len;
+  mt_state* pv_state;
 
   dTHX;
 
   if (!SvOK(sv_state) || !SvPOK(sv_state))
     croak("State must be a string");
 
-  pv_state = SvPV(sv_state, len);
-
+  len = SvCUR(sv_state);
   if (len != sizeof(mt_state))
-    croak("State must be exactly %d bytes, not %d", sizeof(mt_state), len);
+    croak("Need exactly %d state bytes, not %d", sizeof(mt_state), len);
+
+  pv_state = (mt_state*)SvPV_nolen(sv_state);
+
+  if (pv_state->stateptr < 0 || pv_state->stateptr > MT_STATE_SIZE) {
+    warn("stateptr value %d outside valid range [0, %d], using 0 instead",
+         pv_state->stateptr, MT_STATE_SIZE);
+    pv_state->stateptr = 0;
+  }
 
   Copy(pv_state, state, 1, mt_state);
 }
