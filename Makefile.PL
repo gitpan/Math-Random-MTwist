@@ -23,17 +23,17 @@ uint32_t   T_UV
 uint64_t   $uint64_type
 EOTM
 
-print $TMAP q(
+print $TMAP q[
 OUTPUT
 O_OBJECT
-  sv_setref_pv( $arg, CLASS, (void*)$var );
+  sv_setref_pv($arg, CLASS, (void*)$var);
 
 INPUT
 O_OBJECT
-  if( !sv_isobject($arg) || (SvTYPE(SvRV($arg)) != SVt_PVMG) ) {
-    warn( \"${Package}::$func_name() -- $var is not a blessed SV reference\" );
+  if ( !sv_isobject($arg) || (SvTYPE(SvRV($arg)) != SVt_PVMG) ) {
+    warn(\"${Package}::$func_name() -- $var is not a blessed SV reference\");
     XSRETURN_UNDEF;
   }
   $var = ($type)SvIV((SV*)SvRV($arg));
-  *$var = *$var; // tell the compiler that $var is not NULL
-);
+  *$var = *$var; /* tell the compiler that $var is not NULL */
+];

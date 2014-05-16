@@ -15,13 +15,13 @@ use constant {
   MT_BESTSEED => \0,
 };
 
-our $VERSION = '0.13';
+our $VERSION = '0.14';
 
 our @ISA = 'Exporter';
 our @EXPORT = qw(MT_TIMESEED MT_FASTSEED MT_GOODSEED MT_BESTSEED);
 our @EXPORT_OK = @EXPORT;
 our %EXPORT_TAGS = (
-  'rand'  => [qw(srand rand rand32 rand64 irand irand32 irand64)],
+  'rand'  => [qw(srand rand rand32 rand64 irand irand32 irand64 randstr)],
   'seed'  => [qw(seed32 seedfull timeseed fastseed goodseed bestseed)],
   'state' => [qw(savestate loadstate getstate setstate)],
   'dist'  => [
@@ -274,7 +274,7 @@ Returns the current state of the generator as a binary string.
 =item B<setstate($string)>
 
 Sets the state of the generator from C<$string>, which you should have obtained
-with C<getstate()>.
+with C<getstate()>. croak()s if C<$string> is not a string of the correct size.
 
 =back
 
@@ -319,6 +319,11 @@ Returns a random double with 32-bit precision in the range C<[0, $bound)>.
 Slightly faster than rand(). Calls mtwist's C<mts_drand()>.
 
 C<$bound> may be negative. If C<$bound> is omitted or zero it defaults to 1.
+
+=item B<randstr()>, B<randstr($length)>
+
+Returns a random binary string. The default length is 8 bytes. Returns undef if
+there is not enough memory.
 
 =back
 

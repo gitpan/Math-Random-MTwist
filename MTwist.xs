@@ -17,6 +17,8 @@ typedef union {
 #endif
 } int2dbl;
 
+#define I2D_SIZE sizeof(int2dbl)
+
 /*
  * We copy the seeds from an array reference to a buffer so that mtwist can
  * copy the buffer to another buffer. No wonder that computer power must double
@@ -42,22 +44,23 @@ static void get_seeds_from_av(AV* av_seeds, uint32_t* mt_seeds) {
   if (i >= MT_STATE_SIZE)
     i = MT_STATE_SIZE - 1;
 
-  for (; i >= 0; i--) {
+  for (; i >= 0; i--)
     if ((av_seed = av_fetch(av_seeds, i, 0)))
       had_nz |= mt_seeds[i] = SvUV(*av_seed);
-  }
 
   if (! had_nz)
     croak("seedfull(): Need at least one non-zero seed value");
 }
 
-// We calculate gettimeofday() in microseconds and use the lower 32 bits
-// as the seed.
+/*
+ * We calculate gettimeofday() in microseconds and use the lower 32 bit as the
+ * seed.
+ */
 static uint32_t timeseed(mt_state* state) {
   I32 return_count;
   UV usecs;
 
-  // Who invented those silly cryptic macro names?
+  /* Who invented those silly cryptic macro names? */
   dTHX;
   dSP;
 
@@ -147,22 +150,62 @@ static inline int2dbl rd_double(mt_state* state) {
   return i2d;
 }
 
+static SV* randstr(mt_state* state, STRLEN length) {
+  UV nr_blocks, rest;
+  int2dbl rand_i2d;
+  char* randbuf;
+  SV* retval;
+
+  dTHX;
+
+  if (length == 0) {
+    randbuf = savepv("");  /* Perl's version of "strdup()" */
+  }
+  else {
+    Newx(randbuf, length, char);
+    if (!randbuf)
+      return NULL;
+
+    nr_blocks = length / I2D_SIZE;
+    while (nr_blocks)
+      ((int2dbl*)randbuf)[--nr_blocks] = rd_double(state);
+
+    rest = length % I2D_SIZE;
+    if (rest) {
+      rand_i2d = rd_double(state);
+      Copy(rand_i2d.str, randbuf + (length - rest), rest, char);
+    }
+  }
+
+  retval = newSV(0);
+
+  if (retval) {
+    SvUPGRADE(retval, SVt_PV);
+    SvPOK_on(retval);
+    SvPV_set(retval, randbuf);
+    SvCUR_set(retval, length);
+    SvLEN_set(retval, length);
+  }
+
+  return retval;
+}
+
 static FILE* open_file_from_sv(SV* file_sv, char* mode, PerlIO** pio) {
   FILE* fh = NULL;
 
   dTHX;
 
   if (! SvOK(file_sv)) {
-    // file_sv is undef
+    /* file_sv is undef */
     warn("Filename or handle expected");
   }
   else if (SvROK(file_sv) && SvTYPE(SvRV(file_sv)) == SVt_PVGV) {
-    // file_sv is a Perl filehandle
+    /* file_sv is a Perl filehandle */
     *pio = IoIFP(sv_2io(file_sv));
     fh = PerlIO_exportFILE(*pio, NULL);
   }
   else {
-    // file_sv is a filename
+    /* file_sv is a filename */
     fh = fopen(SvPV_nolen(file_sv), mode);
   }
 
@@ -211,28 +254,25 @@ static int loadstate(mt_state* state, SV* file_sv) {
   return RETVAL;
 }
 
-static void set_state_from_sv(mt_state* state, SV* sv_state) {
+static void set_state_from_sv(SV* sv_state, mt_state* state) {
   STRLEN len;
-  mt_state* pv_state;
 
   dTHX;
 
-  if (!SvOK(sv_state) || !SvPOK(sv_state))
+  if (!SvPOK(sv_state))
     croak("State must be a string");
 
   len = SvCUR(sv_state);
   if (len != sizeof(mt_state))
     croak("Need exactly %d state bytes, not %d", sizeof(mt_state), len);
 
-  pv_state = (mt_state*)SvPV_nolen(sv_state);
+  *state = *(mt_state*)SvPV_nolen(sv_state);
 
-  if (pv_state->stateptr < 0 || pv_state->stateptr > MT_STATE_SIZE) {
+  if (state->stateptr < 0 || state->stateptr > MT_STATE_SIZE) {
     warn("stateptr value %d outside valid range [0, %d], using 0 instead",
-         pv_state->stateptr, MT_STATE_SIZE);
-    pv_state->stateptr = 0;
+         state->stateptr, MT_STATE_SIZE);
+    state->stateptr = 0;
   }
-
-  Copy(pv_state, state, 1, mt_state);
 }
 
 
@@ -416,6 +456,21 @@ _rand(double bound = 0)
   OUTPUT:
     RETVAL
 
+### Interestingly, randstr() is faster than rd_double(2).
+SV*
+randstr(mt_state* state, STRLEN length = I2D_SIZE)
+  CODE:
+    RETVAL = randstr(state, length);
+  OUTPUT:
+    RETVAL
+
+SV*
+_randstr(STRLEN length = I2D_SIZE)
+  CODE:
+    RETVAL = randstr(NULL, length);
+  OUTPUT:
+    RETVAL
+
 #define RETURN_I2D(have_index) { \
   if (have_index) {              \
     switch(index) {              \
@@ -426,13 +481,13 @@ _rand(double bound = 0)
       if (sizeof(UV) >= 8)       \
         mPUSHu(i2d.i64);         \
       else                       \
-        mPUSHs(&PL_sv_undef);    \
+        PUSHs(&PL_sv_undef);     \
       break;                     \
     case 2:                      \
       mPUSHp(i2d.str, 8);        \
       break;                     \
     default:                     \
-      mPUSHs(&PL_sv_undef);      \
+      PUSHs(&PL_sv_undef);       \
     }                            \
   }                              \
   else {                         \
@@ -613,9 +668,9 @@ _getstate()
 void
 setstate(mt_state* state, SV* sv_state)
   PPCODE:
-    set_state_from_sv(state, sv_state);
+    set_state_from_sv(sv_state, state);
 
 void
 _setstate(SV* sv_state)
   PPCODE:
-    set_state_from_sv(&mt_default_state, sv_state);
+    set_state_from_sv(sv_state, &mt_default_state);

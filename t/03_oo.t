@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 use Math::Random::MTwist;
-use Test::More tests => 22;
+use Test::More tests => 23;
 
 my $mt = Math::Random::MTwist->new(1_000_686_894);
 
@@ -50,6 +50,9 @@ ok($mt->rd_double() =~ /^8.6196948.+e-145$/, 'rd_double');
   my $state = $mt->getstate();
   ok(length $state > 624*4, 'getstate');
   ok($mt->irand32() == 2_419_637_362, 'irand32 before setstate');
+  my $rs = $mt->rd_double(2);
+
   $mt->setstate($state);
   ok($mt->irand32() == 2_419_637_362, 'irand32 after setstate');
+  ok($rs eq $mt->randstr(), 'randstr');
 }

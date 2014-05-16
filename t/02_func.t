@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 use Math::Random::MTwist qw(:rand :seed :dist :state);
-use Test::More tests => 23;
+use Test::More tests => 24;
 
 # If you change the order of the tests the expected results will change!
 
@@ -50,6 +50,9 @@ ok(rd_double() =~ /^8.6196948.+e-145$/, 'rd_double');
   my $state = getstate();
   ok(length $state > 624*4, 'getstate');
   ok(irand32() == 2_419_637_362, 'irand32 before setstate');
+  my $rs = rd_double(2);
+
   setstate($state);
   ok(irand32() == 2_419_637_362, 'irand32 after setstate');
+  ok($rs eq randstr(), 'randstr');
 }
