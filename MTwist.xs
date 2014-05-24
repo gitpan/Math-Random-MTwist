@@ -151,40 +151,47 @@ static inline int2dbl rd_double(mt_state* state) {
 }
 
 static SV* randstr(mt_state* state, STRLEN length) {
-  UV nr_blocks, rest;
-  int2dbl rand_i2d;
-  char* randbuf;
+  STRLEN bufsize;
+  int2dbl *randbuf;
   SV* retval;
 
   dTHX;
 
-  if (length == 0) {
-    randbuf = savepv("");  /* Perl's version of "strdup()" */
-  }
-  else {
-    Newx(randbuf, length, char);
-    if (!randbuf)
+  if (length == 0)
+    return newSVpvn("", 0);
+
+  /* Make bufsize an integer multiple of I2D_SIZE so that, if it's not, we
+     don't need and extra memcpy() after the rd_double() loop. */
+  bufsize = length;
+  if (bufsize % I2D_SIZE) {
+    /* The next line is the same as bufsize += I2D_SIZE - (bufsize % I2D_SIZE)
+       (since bufsize is unsigned) but it's a bit faster, at least with gcc. */
+    bufsize += (-bufsize) % I2D_SIZE;
+    if (bufsize < length)
       return NULL;
-
-    nr_blocks = length / I2D_SIZE;
-    while (nr_blocks)
-      ((int2dbl*)randbuf)[--nr_blocks] = rd_double(state);
-
-    rest = length % I2D_SIZE;
-    if (rest) {
-      rand_i2d = rd_double(state);
-      Copy(rand_i2d.str, randbuf + (length - rest), rest, char);
-    }
   }
 
   retval = newSV(0);
+  if (!retval)
+    return NULL;
 
-  if (retval) {
-    SvUPGRADE(retval, SVt_PV);
-    SvPOK_on(retval);
-    SvPV_set(retval, randbuf);
-    SvCUR_set(retval, length);
-    SvLEN_set(retval, length);
+  SvUPGRADE(retval, SVt_PV);
+  SvPOK_on(retval);
+  SvCUR_set(retval, length);
+  SvLEN_set(retval, bufsize);
+
+  Newxc(randbuf, bufsize, char, int2dbl);
+  if (!randbuf) {
+    Safefree(retval);
+    return NULL;
+  }
+
+  SvPV_set(retval, (char*)randbuf);
+
+  /* Loads of preparatory code just for this tiny little loop! This sucks! */
+  while (bufsize) {
+    *(randbuf++) = rd_double(state);
+    bufsize -= I2D_SIZE;
   }
 
   return retval;

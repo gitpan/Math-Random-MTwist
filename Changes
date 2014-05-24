@@ -1,5 +1,8 @@
 Revision history for Perl extension Math::Random::MTwist.
 
+0.15  2014-05-24
+* randstr() cleanup.
+
 0.14  2014-05-16
 * Added randstr().
 * Some optimizations.
