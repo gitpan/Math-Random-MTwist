@@ -28,7 +28,7 @@ typedef union {
  * We assume that mt_seeds[] has been initialized with zeros.
  */
 static void get_seeds_from_av(AV* av_seeds, uint32_t* mt_seeds) {
-  I32 i;
+  SSize_t i;
   SV** av_seed;
   uint32_t had_nz = 0;
 
@@ -482,19 +482,16 @@ _randstr(STRLEN length = I2D_SIZE)
   if (have_index) {              \
     switch(index) {              \
     case 0:                      \
-      mPUSHn(i2d.dbl);           \
-      break;                     \
+      XSRETURN_NV(i2d.dbl);      \
     case 1:                      \
       if (sizeof(UV) >= 8)       \
-        mPUSHu(i2d.i64);         \
+        XSRETURN_UV(i2d.i64);    \
       else                       \
-        PUSHs(&PL_sv_undef);     \
-      break;                     \
+        XSRETURN_UNDEF;          \
     case 2:                      \
-      mPUSHp(i2d.str, 8);        \
-      break;                     \
+      XSRETURN_PVN(i2d.str, 8);  \
     default:                     \
-      PUSHs(&PL_sv_undef);       \
+      XSRETURN_UNDEF;            \
     }                            \
   }                              \
   else {                         \
@@ -504,7 +501,7 @@ _randstr(STRLEN length = I2D_SIZE)
       if (sizeof(UV) >= 8)       \
         mPUSHu(i2d.i64);         \
       else                       \
-        mPUSHs(&PL_sv_undef);    \
+        PUSHs(&PL_sv_undef);     \
       mPUSHp(i2d.str, 8);        \
     }                            \
   }                              \
