@@ -1,5 +1,8 @@
 Revision history for Perl extension Math::Random::MTwist.
 
+0.17  2014-08-04
+* Fixed version mismatch.
+
 0.16  2014-05-27
 * get_seeds_from_av(): av_len() returns an SSize_t since Perl 5.20.
 
